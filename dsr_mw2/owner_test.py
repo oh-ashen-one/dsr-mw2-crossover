@@ -16,7 +16,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-from . import action_trial, mpeg_audio_trial, owner_diagnostics, controller_setup
+from . import action_trial, mpeg_audio_trial, owner_diagnostics, controller_setup, window_controls
 from .install_private import WORKSPACE, atomic_write
 from .profile import guard
 from .runtime_paths import bottle_path
@@ -75,6 +75,7 @@ def stage():
     before=verify(bottle);expected();action_trial.manifest()
     controller=controller_setup.configure(bottle)
     diagnostic=owner_diagnostics.stage(WORKSPACE,bottle)
+    windows=window_controls.stage(WORKSPACE,bottle)
     source, report=viewmodel_spec()
     with (bottle/'.dsr-mw2-session.lock').open('a+') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -89,7 +90,7 @@ def stage():
             if not previous.exists():atomic_write(previous,target.read_bytes())
         if not target.exists() or sha(target)!=report['sha256']:atomic_write(target,source.read_bytes())
         viewmodel_check()
-    return {'owner_saves':before,'controller':controller,'diagnostic':diagnostic,'viewmodel_sha256':report['sha256']}
+    return {'owner_saves':before,'controller':controller,'diagnostic':diagnostic,'windows':windows,'viewmodel_sha256':report['sha256']}
 
 
 @contextmanager
@@ -157,6 +158,7 @@ def main():
             print('Create or load your private test character. Your earlier saves stay separate.',flush=True)
             print('M9: hold L2 / right mouse to aim, R2 or R1 / left mouse to fire, Square while aiming / R to reload.',flush=True)
             print('The first Asylum bonfire has the M9 armory. D-pad Right switches equipped guns.',flush=True)
+            print('Window: Control+Option+1/2/3 for 720p/900p/1080p; Control+Option+M minimizes to free the mouse. Command+Tab also switches away.',flush=True)
             print('New first-person rendering and physical controller response still need your test. This session has a two-hour handling limit.',flush=True)
             print('Quit normally when done; this window restores the private baseline. You control all play.',flush=True)
             log=WORKSPACE/'tooling-local/launch/owner-test.log';log.parent.mkdir(exist_ok=True)

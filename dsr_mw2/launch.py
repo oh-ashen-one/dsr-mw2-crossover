@@ -21,6 +21,7 @@ from .native_runtime import check as check_native_runtime
 from .install_audio import check as check_audio
 from .save_banks import inspect as inspect_save_banks, select_locked as select_save_bank
 from .owner_diagnostics import start as start_read_only_diagnostics
+from .window_controls import start as start_window_controls
 
 BOTTLE = bottle_path()
 from .local_config import path as configured_path
@@ -213,8 +214,13 @@ def run_inside(mode: str) -> int:
             shutdown = None
             diagnostic_children = []
             if mode != "steam-login":
-                diagnostics = (lambda pids: start_read_only_diagnostics(
-                    mode, pids, WORKSPACE, BOTTLE, network_wrapper(mode), diagnostic_children)) if mode in M9_MODES else None
+                def started(pids):
+                    diagnostic = start_read_only_diagnostics(
+                        mode, pids, WORKSPACE, BOTTLE, network_wrapper(mode), diagnostic_children)
+                    window = start_window_controls(
+                        mode, pids, WORKSPACE, BOTTLE, network_wrapper(mode), diagnostic_children)
+                    return {**diagnostic, 'window_controls': window}
+                diagnostics = started if mode in M9_MODES else None
                 started_game = watch_game(process, on_started=diagnostics)
                 if not started_game:
                     print(json.dumps({"status": "steam_did_not_start_native_game", "runtime_verified": False}), flush=True)

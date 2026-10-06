@@ -89,6 +89,7 @@ PYTHONPATH=. .venv/bin/python -B tools/prepare_m9_audio.py
 PYTHONPATH=. .venv/bin/python -B tools/build_native_m9_mpeg.py
 PYTHONPATH=. .venv/bin/python -B tools/build_m9_viewmodel.py
 PYTHONPATH=. python3 -B tools/build_native_observer.py
+PYTHONPATH=. python3 -B tools/build_window_controls.py
 PYTHONPATH=. python3 -B tools/build_m9_handling.py
 PYTHONPATH=. python3 -B tools/native_input_trial.py build
 PYTHONPATH=. python3 -B tools/prepare_native_research.py

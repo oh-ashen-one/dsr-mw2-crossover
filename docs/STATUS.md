@@ -13,6 +13,7 @@ This release preserves the current M9 source build. It is not a claim of a compl
 | Armory | Earlier native test purchased the suppressor variant, equipped it in either right-hand slot and confirmed native save persistence. Appearance only: no distinct suppressed audio/range. |
 | New first-person renderer | Original D3D11 source compiles. Source-asset packet, static hook contracts and HLSL stages were checked offline. Actual rendering/state restoration in DSR remains unverified. |
 | Physical PS5 controller | Private WineBus correction and XInput mapping prepared; physical button response remains unverified. |
+| Window management | Original external helper enables resize borders and foreground-only size/minimize shortcuts. A hidden-window CrossOver fixture passed without opening DSR. Actual DSR resizing and shortcuts remain unverified. |
 | Boss/death/reset/performance | Full repeatable boss encounter, death/restart/defeat, long-session behavior and performance remain unverified. |
 
 The earlier world-model prototype was rejected for crossbow-like handling and poor presentation. Later native handling work and the new first-person candidate address parts of that feedback; this release does not erase the remaining acceptance gates.
