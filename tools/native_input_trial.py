@@ -28,7 +28,7 @@ RECEIPT=ROOT/'evidence/native-input-build.json'
 SOURCES=['native/src/xinput_observer.cpp','native/xinput_observer.def',
          'native/src/dsr_snapshot.cpp','native/include/dsr_snapshot.hpp',
          'native/src/entry_observer.cpp','native/src/entry_observer.S','native/include/entry_observer.hpp',
-         'native/include/m9_magazine.hpp','native/include/m9_native_aim.hpp','native/include/m9_aim_latch.hpp',
+         'native/include/m9_magazine.hpp','native/include/m9_action_input.hpp','native/include/m9_native_aim.hpp','native/include/m9_aim_latch.hpp',
          'native/include/m9_recoil_delta.hpp','native/include/m9_camera_angles.hpp',
          'native/include/iw4_view_kick.hpp','native/src/iw4_view_kick.cpp',
          'native/include/viewmodel_packet.hpp','native/include/packet_buffer.hpp','native/include/viewmodel_renderer.hpp','native/src/viewmodel_renderer.cpp']

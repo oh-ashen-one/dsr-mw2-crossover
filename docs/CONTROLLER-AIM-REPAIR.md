@@ -1,0 +1,7 @@
+# Controller focus and two-handed aim repair
+
+The Windows Steam overlay was observed disabling raw input while the game still received connected XInput states. The private owner-test profile now disables its overlay and guide-button focus behavior using the installed Steam settings descriptors. Steam starts silently; the verified game window receives one startup focus request. Other Steam installations, credentials and saves are untouched.
+
+The gun adapter now intercepts native heavy fire (R2/action 1) as well as light fire. Previously, this could consume a real round outside the virtual magazine and permanently disable ADS. Explicit L2/right-mouse aim now works through the guarded request path regardless of whether native crossbow precision actions are emitted in the hand stance. A valid late ammo decrement leaves zero virtual rounds and requires reload without permanently faulting aiming. Invalid native receipts still fault. No HP, inventory or save edits.
+
+Source validation: strict Windows compilation, three AddressSanitizer/UndefinedBehaviorSanitizer fixtures, and the Python suite. The native M9 model/audio/viewmodel are unchanged. Physical two-handed aim and ongoing crash-free gameplay still need owner acceptance. A previous native null-read crash occurred without acquired ADS or an initialized viewmodel renderer; its root cause is not established and this patch must not be described as a proven crash fix.

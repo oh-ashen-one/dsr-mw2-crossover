@@ -16,7 +16,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-from . import action_trial, mpeg_audio_trial, owner_diagnostics, controller_setup, window_controls
+from . import action_trial, mpeg_audio_trial, owner_diagnostics, controller_setup, window_controls, steam_controller_focus
 from .install_private import WORKSPACE, atomic_write
 from .profile import guard
 from .runtime_paths import bottle_path
@@ -74,6 +74,7 @@ def stage():
     if guard(bottle) or bottle_processes(bottle):raise ValueError('Private profile must be closed before preparing the owner test')
     before=verify(bottle);expected();action_trial.manifest()
     controller=controller_setup.configure(bottle)
+    steam_focus=steam_controller_focus.configure(bottle)
     diagnostic=owner_diagnostics.stage(WORKSPACE,bottle)
     windows=window_controls.stage(WORKSPACE,bottle)
     source, report=viewmodel_spec()
@@ -90,7 +91,7 @@ def stage():
             if not previous.exists():atomic_write(previous,target.read_bytes())
         if not target.exists() or sha(target)!=report['sha256']:atomic_write(target,source.read_bytes())
         viewmodel_check()
-    return {'owner_saves':before,'controller':controller,'diagnostic':diagnostic,'windows':windows,'viewmodel_sha256':report['sha256']}
+    return {'owner_saves':before,'controller':controller,'steam_focus':steam_focus,'diagnostic':diagnostic,'windows':windows,'viewmodel_sha256':report['sha256']}
 
 
 @contextmanager

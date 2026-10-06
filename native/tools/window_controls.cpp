@@ -95,6 +95,11 @@ int main(int argc,char** argv) {
     }
     std::printf("{\"event\":\"resizable_style_applied\",\"windows_pid\":%lu,\"gameplay_input\":false}\n",target.pid);
     std::fflush(stdout);
+    // One launch-time focus request for this exact owned window. Never poll
+    // to steal focus back from the owner's other apps during play.
+    const bool focused=SetForegroundWindow(target.window)!=0;
+    std::printf("{\"event\":\"startup_focus_requested\",\"accepted\":%s,\"gameplay_input\":false}\n",focused?"true":"false");
+    std::fflush(stdout);
     bool registered[4]{};
     const UINT keys[4]={'1','2','3','M'};
     // Only observe keys registered to this helper. Never synthesize input.

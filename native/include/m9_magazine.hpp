@@ -64,7 +64,12 @@ public:
     }
     void consume(std::uint64_t actor,int before,int after,int result,double now){
         if(actor!=player)return;
-        if(after!=before-1||result!=after||loaded<=0){fault=true;cancel();return;}
+        if(before<=0||after!=before-1||result!=after){fault=true;cancel();return;}
+        // A real native shot can finish after a loadout/focus transition, when
+        // our virtual magazine is empty. Keep the authoritative decrement,
+        // require release/reload, and retain ADS; never invent a round or turn
+        // a valid receipt into a permanent aiming fault.
+        if(loaded<=0){loaded=0;armed=false;cancel();last_shot=now;return;}
         --loaded;last_shot=now;
     }
     void cancel(){reloading=false;seen=false;credited=false;last_progress=-1;}

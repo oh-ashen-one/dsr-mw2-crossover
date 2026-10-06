@@ -12,6 +12,7 @@
 #include "dsr_snapshot.hpp"
 #include "entry_observer.hpp"
 #include "m9_magazine.hpp"
+#include "m9_action_input.hpp"
 #include "m9_native_aim.hpp"
 #include "m9_recoil_delta.hpp"
 #include "m9_camera_angles.hpp"
@@ -254,7 +255,7 @@ void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
             }
         }
         const auto pad=current_controller();
-        f.fire=s.actions[0]||s.actions[7]||(f.focused&&pad.bRightTrigger>=64);
+        f.fire=dsr_mw2::m9_fire_intent(s.actions,f.focused&&pad.bRightTrigger>=64);
         // Native precision mode suppresses item-use/action14. Read only the
         // owned game's explicit reload key in its already-qualified M9 context.
         f.reload=f.focused&&((GetAsyncKeyState('R')&0x8000)||(aim_enabled&&aim.owned&&(pad.wButtons&XINPUT_GAMEPAD_X)));
@@ -272,7 +273,11 @@ void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
                 (f.animation<0||f.animation==463000||f.animation==465500||f.animation==465501||f.animation==465502);
             const bool held=f.focused&&((GetAsyncKeyState(VK_RBUTTON)&0x8000)||pad.bLeftTrigger>=64);
             const bool resumable=f.focused&&!f.interrupted&&!magazine.fault;
-            const bool changed=aim.step(reader,base,s,allowed,held,s.actions[19]||s.actions[51],resumable);
+            // L2/RMB is the explicit aim request in either hand stance. Native
+            // crossbow precision requests are not emitted in every stance.
+            // The latch still requires neutral/re-press and verified native
+            // menu/context bits; it never takes an already-owned native bit.
+            const bool changed=aim.step(reader,base,s,allowed,held,held||s.actions[19]||s.actions[51],resumable);
             if(changed||pad_calls%12==0||aim.fault){
                 char line[768]{};const int n=std::snprintf(line,sizeof(line),
                     "{\"kind\":\"native_aim_trial\",\"ms\":%llu,\"held\":%s,\"owned\":%s,\"fault\":%s,\"before\":%u,\"after\":%u,\"camera_read\":%s,\"camera_active\":%u,\"pitch\":%.9g,\"yaw\":%.9g,\"zoom\":%.9g}\n",
@@ -285,10 +290,8 @@ void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
         if(view_enabled)dsr_mw2::vm_publish({s.player,GetTickCount64(),s.right_weapon,f.animation,magazine.loaded,
             static_cast<float>(f.elapsed),f.focused&&aim.owned&&!aim.fault&&!magazine.fault&&!f.interrupted});
         if(f.focused){
-            auto actions=s.actions;for(auto i:{0,5,7,37,38,39,40})actions[static_cast<unsigned>(i)]=0;
-            if(f.reload||magazine.reloading)actions[14]=0;
-            if(aim_enabled)for(auto i:{19,51,52})actions[static_cast<unsigned>(i)]=0;
-            if(request)actions[static_cast<unsigned>(request)]=1;
+            auto actions=s.actions;
+            dsr_mw2::m9_route_actions(actions,request,f.reload||magazine.reloading,aim_enabled);
             std::memcpy(reinterpret_cast<void*>(manipulator+0x84),actions.data(),actions.size());
         }
         if(request||magazine.fault||pad_calls%30==0){

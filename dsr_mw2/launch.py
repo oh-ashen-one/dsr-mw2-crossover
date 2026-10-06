@@ -173,7 +173,7 @@ def run_inside(mode: str) -> int:
         # does not disable CEF sandboxing or change game/global GPU settings.
         ui_args = ["-cef-disable-gpu"] if os.environ.get("DSR_MW2_STEAM_SOFTWARE_UI", "1") == "1" else []
         cmd = [*network_wrapper(mode), *command(
-            r"C:\Program Files (x86)\Steam\Steam.exe", *ui_args, "-applaunch", "570940",
+            r"C:\Program Files (x86)\Steam\Steam.exe", *ui_args, "-silent", "-applaunch", "570940",
             dll_overrides='xinput1_3=n,b' if native_input_trial(mode) else None,
             seh_trace=native_input_trial(mode) and os.environ.get('DSR_MW2_SEH_TRACE')=='validation-v1')]
         cwd = BOTTLE / "drive_c/Games" / folder
