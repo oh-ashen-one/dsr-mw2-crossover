@@ -1,0 +1,14 @@
+LIBRARY xinput1_3
+EXPORTS
+ DllMain=xinput1_3_backend.DllMain @1
+ XInputGetState @2
+ XInputSetState=xinput1_3_backend.XInputSetState @3
+ XInputGetCapabilities=xinput1_3_backend.XInputGetCapabilities @4
+ XInputEnable=xinput1_3_backend.XInputEnable @5
+ XInputGetDSoundAudioDeviceGuids=xinput1_3_backend.XInputGetDSoundAudioDeviceGuids @6
+ XInputGetBatteryInformation=xinput1_3_backend.XInputGetBatteryInformation @7
+ XInputGetKeystroke=xinput1_3_backend.XInputGetKeystroke @8
+ XInputOrdinal100="xinput1_3_backend.#100" @100 NONAME
+ XInputOrdinal101="xinput1_3_backend.#101" @101 NONAME
+ XInputOrdinal102="xinput1_3_backend.#102" @102 NONAME
+ XInputOrdinal103="xinput1_3_backend.#103" @103 NONAME

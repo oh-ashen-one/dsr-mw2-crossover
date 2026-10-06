@@ -1,0 +1,14 @@
+# Working local tool environment; no retail files included. Python >=3.13.
+soulstruct @ git+https://github.com/Grimrukh/soulstruct.git@12b69189a2ccebbc623a1b6565be89a18d6c9958
+annotated-doc==0.0.5
+constrata==1.3.3
+frozendict==2.4.7
+markdown-it-py==4.2.0
+mdurl==0.1.2
+numpy==2.5.3
+Pygments==2.21.0
+rich==15.0.0
+shellingham==1.5.4
+typer==0.27.2
+zstandard==0.25.0
+Pillow==12.3.0

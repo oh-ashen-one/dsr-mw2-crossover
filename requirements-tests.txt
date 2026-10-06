@@ -1,0 +1,2 @@
+# Synthetic texture tests; no Soulstruct or retail data needed.
+Pillow==12.3.0

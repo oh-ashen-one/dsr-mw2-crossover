@@ -1,0 +1,130 @@
+diff --git a/premake5.lua b/premake5.lua
+index 8513343..d35f48f 100644
+--- a/premake5.lua
++++ b/premake5.lua
+@@ -18 +18 @@ workspace "OpenAssetTools"
+-    systemversion "latest"
++    systemversion "15.0"
+diff --git a/src/ModMan/Context/FastFileContext.cpp b/src/ModMan/Context/FastFileContext.cpp
+index c01a1ae..e3ed90d 100644
+--- a/src/ModMan/Context/FastFileContext.cpp
++++ b/src/ModMan/Context/FastFileContext.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ModMan/Web/Binds/UnlinkingBinds.cpp b/src/ModMan/Web/Binds/UnlinkingBinds.cpp
+index 0df00a7..e7c3941 100644
+--- a/src/ModMan/Web/Binds/UnlinkingBinds.cpp
++++ b/src/ModMan/Web/Binds/UnlinkingBinds.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjCommon/Csv/CsvHeaderRow.cpp b/src/ObjCommon/Csv/CsvHeaderRow.cpp
+index d1d9947..4cb68ae 100644
+--- a/src/ObjCommon/Csv/CsvHeaderRow.cpp
++++ b/src/ObjCommon/Csv/CsvHeaderRow.cpp
+@@ -2,0 +3,2 @@
++#include <algorithm>
++
+diff --git a/src/ObjCommon/InfoString/InfoString.cpp b/src/ObjCommon/InfoString/InfoString.cpp
+index 4165585..ee6f88b 100644
+--- a/src/ObjCommon/InfoString/InfoString.cpp
++++ b/src/ObjCommon/InfoString/InfoString.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjCompiling/Game/IW4/Material/CompilerMaterialIW4.cpp b/src/ObjCompiling/Game/IW4/Material/CompilerMaterialIW4.cpp
+index 16b164d..db043f4 100644
+--- a/src/ObjCompiling/Game/IW4/Material/CompilerMaterialIW4.cpp
++++ b/src/ObjCompiling/Game/IW4/Material/CompilerMaterialIW4.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjCompiling/Techset/Parsing/Sequence/TechniqueShaderScopeSequences.cpp b/src/ObjCompiling/Techset/Parsing/Sequence/TechniqueShaderScopeSequences.cpp
+index 44cdf73..0ce8a40 100644
+--- a/src/ObjCompiling/Techset/Parsing/Sequence/TechniqueShaderScopeSequences.cpp
++++ b/src/ObjCompiling/Techset/Parsing/Sequence/TechniqueShaderScopeSequences.cpp
+@@ -0,0 +1 @@
++#include <sstream>
+diff --git a/src/ObjCompiling/Techset/StateMap/Parsing/StateMapParser.cpp b/src/ObjCompiling/Techset/StateMap/Parsing/StateMapParser.cpp
+index 1e0bbeb..3ea0b45 100644
+--- a/src/ObjCompiling/Techset/StateMap/Parsing/StateMapParser.cpp
++++ b/src/ObjCompiling/Techset/StateMap/Parsing/StateMapParser.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjLoading/Asset/GlobalAssetPoolsLoader.h b/src/ObjLoading/Asset/GlobalAssetPoolsLoader.h
+index 09c348b..5455594 100644
+--- a/src/ObjLoading/Asset/GlobalAssetPoolsLoader.h
++++ b/src/ObjLoading/Asset/GlobalAssetPoolsLoader.h
+@@ -38 +38 @@ public:
+-        auto* existingAsset = GameGlobalAssetPools::GetGlobalPoolsForGame(m_zone.m_game_id)->GetAsset<Asset_t>(assetName);
++        auto* existingAsset = GameGlobalAssetPools::GetGlobalPoolsForGame(m_zone.m_game_id)->template GetAsset<Asset_t>(assetName);
+diff --git a/src/ObjLoading/ObjContainer/IPak/IPak.cpp b/src/ObjLoading/ObjContainer/IPak/IPak.cpp
+index d5eb90f..a80a614 100644
+--- a/src/ObjLoading/ObjContainer/IPak/IPak.cpp
++++ b/src/ObjLoading/ObjContainer/IPak/IPak.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjLoading/ObjContainer/SoundBank/SoundBankWriter.cpp b/src/ObjLoading/ObjContainer/SoundBank/SoundBankWriter.cpp
+index 992ec66..9a6d623 100644
+--- a/src/ObjLoading/ObjContainer/SoundBank/SoundBankWriter.cpp
++++ b/src/ObjLoading/ObjContainer/SoundBank/SoundBankWriter.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjLoading/XAnim/FlatXAnimDataWriter.cpp b/src/ObjLoading/XAnim/FlatXAnimDataWriter.cpp
+index 947ee92..8afb7a4 100644
+--- a/src/ObjLoading/XAnim/FlatXAnimDataWriter.cpp
++++ b/src/ObjLoading/XAnim/FlatXAnimDataWriter.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjLoading/XModel/Gltf/GltfLoader.cpp b/src/ObjLoading/XModel/Gltf/GltfLoader.cpp
+index 3b45293..6f45ca5 100644
+--- a/src/ObjLoading/XModel/Gltf/GltfLoader.cpp
++++ b/src/ObjLoading/XModel/Gltf/GltfLoader.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjWriting/Material/AbstractMaterialConstantZoneState.cpp b/src/ObjWriting/Material/AbstractMaterialConstantZoneState.cpp
+index 57cae6f..36a467a 100644
+--- a/src/ObjWriting/Material/AbstractMaterialConstantZoneState.cpp
++++ b/src/ObjWriting/Material/AbstractMaterialConstantZoneState.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjWriting/Techset/CommonTechniqueDumper.cpp b/src/ObjWriting/Techset/CommonTechniqueDumper.cpp
+index 2c6c9ff..d489947 100644
+--- a/src/ObjWriting/Techset/CommonTechniqueDumper.cpp
++++ b/src/ObjWriting/Techset/CommonTechniqueDumper.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/Parser/Parsing/Impl/DefinesStreamProxy.cpp b/src/Parser/Parsing/Impl/DefinesStreamProxy.cpp
+index c2e20fb..b4983a8 100644
+--- a/src/Parser/Parsing/Impl/DefinesStreamProxy.cpp
++++ b/src/Parser/Parsing/Impl/DefinesStreamProxy.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/Parser/Parsing/Simple/Matcher/SimpleMatcherAnyCharacterBesides.cpp b/src/Parser/Parsing/Simple/Matcher/SimpleMatcherAnyCharacterBesides.cpp
+index c89d86d..0e919cd 100644
+--- a/src/Parser/Parsing/Simple/Matcher/SimpleMatcherAnyCharacterBesides.cpp
++++ b/src/Parser/Parsing/Simple/Matcher/SimpleMatcherAnyCharacterBesides.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/RawTemplater/Templating/Templater.cpp b/src/RawTemplater/Templating/Templater.cpp
+index c26d6d7..373b0c2 100644
+--- a/src/RawTemplater/Templating/Templater.cpp
++++ b/src/RawTemplater/Templating/Templater.cpp
+@@ -0,0 +1 @@
++#include <sstream>
+diff --git a/src/Unlinking/Unlinker.cpp b/src/Unlinking/Unlinker.cpp
+index a9e9896..26b860e 100644
+--- a/src/Unlinking/Unlinker.cpp
++++ b/src/Unlinking/Unlinker.cpp
+@@ -0,0 +1 @@
++#include <sstream>
+diff --git a/src/Utils/Utils/Arguments/UsageInformation.cpp b/src/Utils/Utils/Arguments/UsageInformation.cpp
+index e3f393a..e7be7b0 100644
+--- a/src/Utils/Utils/Arguments/UsageInformation.cpp
++++ b/src/Utils/Utils/Arguments/UsageInformation.cpp
+@@ -0,0 +1 @@
++#include <sstream>
+diff --git a/thirdparty/zlib.lua b/thirdparty/zlib.lua
+index 742a1f0..030683b 100644
+--- a/thirdparty/zlib.lua
++++ b/thirdparty/zlib.lua
+@@ -47 +47 @@ function zlib:project()
+-		filter "system:linux"
++		filter "system:linux or macosx"

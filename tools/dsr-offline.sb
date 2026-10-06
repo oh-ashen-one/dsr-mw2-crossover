@@ -1,0 +1,8 @@
+;; Per-launch IP restriction. No host firewall or global setting is changed.
+;; Steam also needs loopback TCP for its own UI and local game communication.
+(version 1)
+(allow default)
+(deny network-outbound (remote ip "*:*"))
+(allow network-outbound (remote ip "localhost:*"))
+(deny network-inbound (local ip "*:*"))
+(allow network-inbound (local ip "localhost:*"))

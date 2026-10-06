@@ -1,0 +1,358 @@
+diff --git a/premake5.lua b/premake5.lua
+index 8513343..d35f48f 100644
+--- a/premake5.lua
++++ b/premake5.lua
+@@ -18 +18 @@ workspace "OpenAssetTools"
+-    systemversion "latest"
++    systemversion "15.0"
+diff --git a/src/Common/Game/IW4/IW4_Assets.h b/src/Common/Game/IW4/IW4_Assets.h
+index e3d63d3..4f5f355 100644
+--- a/src/Common/Game/IW4/IW4_Assets.h
++++ b/src/Common/Game/IW4/IW4_Assets.h
+@@ -1769,3 +1769,4 @@ namespace IW4
+-        int format;
+-        const void* data_ptr;
+-        unsigned int data_len;
++        // Installed native64 IW4 sound wire header. Audio export is outside
++        // this target; the measured data_len must advance to the next asset.
++        uint16_t format;
++        uint16_t channels;
+@@ -1773,2 +1774,3 @@ namespace IW4
+-        int bits;
+-        int channels;
++        unsigned int average_bytes_per_second;
++        uint16_t block_align;
++        uint16_t bits;
+@@ -1776,0 +1779,3 @@ namespace IW4
++        unsigned int data_len;
++        unsigned int unknown_28;
++        const void* data_ptr;
+@@ -1822,3 +1827,3 @@ namespace IW4
+-        int speaker;
+-        int numLevels;
+-        float levels[2];
++        // Installed native64 IW4 wire record: packed speaker key + one level.
++        unsigned int speaker;
++        float level;
+@@ -1830 +1835 @@ namespace IW4
+-        MSSSpeakerLevels speakers[6];
++        MSSSpeakerLevels* speakers;
+diff --git a/src/ModMan/Context/FastFileContext.cpp b/src/ModMan/Context/FastFileContext.cpp
+index c01a1ae..e3ed90d 100644
+--- a/src/ModMan/Context/FastFileContext.cpp
++++ b/src/ModMan/Context/FastFileContext.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ModMan/Web/Binds/UnlinkingBinds.cpp b/src/ModMan/Web/Binds/UnlinkingBinds.cpp
+index 0df00a7..e7c3941 100644
+--- a/src/ModMan/Web/Binds/UnlinkingBinds.cpp
++++ b/src/ModMan/Web/Binds/UnlinkingBinds.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjCommon/Csv/CsvHeaderRow.cpp b/src/ObjCommon/Csv/CsvHeaderRow.cpp
+index d1d9947..4cb68ae 100644
+--- a/src/ObjCommon/Csv/CsvHeaderRow.cpp
++++ b/src/ObjCommon/Csv/CsvHeaderRow.cpp
+@@ -2,0 +3,2 @@
++#include <algorithm>
++
+diff --git a/src/ObjCommon/InfoString/InfoString.cpp b/src/ObjCommon/InfoString/InfoString.cpp
+index 4165585..ee6f88b 100644
+--- a/src/ObjCommon/InfoString/InfoString.cpp
++++ b/src/ObjCommon/InfoString/InfoString.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjCompiling/Game/IW4/Material/CompilerMaterialIW4.cpp b/src/ObjCompiling/Game/IW4/Material/CompilerMaterialIW4.cpp
+index 16b164d..db043f4 100644
+--- a/src/ObjCompiling/Game/IW4/Material/CompilerMaterialIW4.cpp
++++ b/src/ObjCompiling/Game/IW4/Material/CompilerMaterialIW4.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjCompiling/Techset/Parsing/Sequence/TechniqueShaderScopeSequences.cpp b/src/ObjCompiling/Techset/Parsing/Sequence/TechniqueShaderScopeSequences.cpp
+index 44cdf73..0ce8a40 100644
+--- a/src/ObjCompiling/Techset/Parsing/Sequence/TechniqueShaderScopeSequences.cpp
++++ b/src/ObjCompiling/Techset/Parsing/Sequence/TechniqueShaderScopeSequences.cpp
+@@ -0,0 +1 @@
++#include <sstream>
+diff --git a/src/ObjCompiling/Techset/StateMap/Parsing/StateMapParser.cpp b/src/ObjCompiling/Techset/StateMap/Parsing/StateMapParser.cpp
+index 1e0bbeb..3ea0b45 100644
+--- a/src/ObjCompiling/Techset/StateMap/Parsing/StateMapParser.cpp
++++ b/src/ObjCompiling/Techset/StateMap/Parsing/StateMapParser.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjLoading/Asset/GlobalAssetPoolsLoader.h b/src/ObjLoading/Asset/GlobalAssetPoolsLoader.h
+index 09c348b..5455594 100644
+--- a/src/ObjLoading/Asset/GlobalAssetPoolsLoader.h
++++ b/src/ObjLoading/Asset/GlobalAssetPoolsLoader.h
+@@ -38 +38 @@ public:
+-        auto* existingAsset = GameGlobalAssetPools::GetGlobalPoolsForGame(m_zone.m_game_id)->GetAsset<Asset_t>(assetName);
++        auto* existingAsset = GameGlobalAssetPools::GetGlobalPoolsForGame(m_zone.m_game_id)->template GetAsset<Asset_t>(assetName);
+diff --git a/src/ObjLoading/ObjContainer/IPak/IPak.cpp b/src/ObjLoading/ObjContainer/IPak/IPak.cpp
+index d5eb90f..a80a614 100644
+--- a/src/ObjLoading/ObjContainer/IPak/IPak.cpp
++++ b/src/ObjLoading/ObjContainer/IPak/IPak.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjLoading/ObjContainer/SoundBank/SoundBankWriter.cpp b/src/ObjLoading/ObjContainer/SoundBank/SoundBankWriter.cpp
+index 992ec66..9a6d623 100644
+--- a/src/ObjLoading/ObjContainer/SoundBank/SoundBankWriter.cpp
++++ b/src/ObjLoading/ObjContainer/SoundBank/SoundBankWriter.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjLoading/XAnim/FlatXAnimDataWriter.cpp b/src/ObjLoading/XAnim/FlatXAnimDataWriter.cpp
+index 947ee92..8afb7a4 100644
+--- a/src/ObjLoading/XAnim/FlatXAnimDataWriter.cpp
++++ b/src/ObjLoading/XAnim/FlatXAnimDataWriter.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjLoading/XModel/Gltf/GltfLoader.cpp b/src/ObjLoading/XModel/Gltf/GltfLoader.cpp
+index 3b45293..6f45ca5 100644
+--- a/src/ObjLoading/XModel/Gltf/GltfLoader.cpp
++++ b/src/ObjLoading/XModel/Gltf/GltfLoader.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjWriting/Dumping/AbstractAssetDumper.h b/src/ObjWriting/Dumping/AbstractAssetDumper.h
+index a2e493b..6b196ee 100644
+--- a/src/ObjWriting/Dumping/AbstractAssetDumper.h
++++ b/src/ObjWriting/Dumping/AbstractAssetDumper.h
+@@ -6,0 +7 @@
++#include <cstdlib>
+@@ -44 +45,2 @@ protected:
+-        return true;
++        const char* requested = std::getenv("DSR_MW2_EXTRACT_MODEL");
++        return !requested || asset.m_name == requested;
+diff --git a/src/ObjWriting/Material/AbstractMaterialConstantZoneState.cpp b/src/ObjWriting/Material/AbstractMaterialConstantZoneState.cpp
+index 57cae6f..36a467a 100644
+--- a/src/ObjWriting/Material/AbstractMaterialConstantZoneState.cpp
++++ b/src/ObjWriting/Material/AbstractMaterialConstantZoneState.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjWriting/Techset/CommonTechniqueDumper.cpp b/src/ObjWriting/Techset/CommonTechniqueDumper.cpp
+index 2c6c9ff..d489947 100644
+--- a/src/ObjWriting/Techset/CommonTechniqueDumper.cpp
++++ b/src/ObjWriting/Techset/CommonTechniqueDumper.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/ObjWriting/XModel/Obj/ObjWriter.cpp b/src/ObjWriting/XModel/Obj/ObjWriter.cpp
+index a883997..804f55c 100644
+--- a/src/ObjWriting/XModel/Obj/ObjWriter.cpp
++++ b/src/ObjWriting/XModel/Obj/ObjWriter.cpp
+@@ -220 +220 @@ namespace obj
+-        return std::make_unique<ObjWriter>(stream, std::move(mtlName), std::move(gameName), std::move(zoneName));
++        return std::make_unique<ObjWriter>(stream, std::move(gameName), std::move(zoneName), std::move(mtlName));
+diff --git a/src/Parser/Parsing/Impl/DefinesStreamProxy.cpp b/src/Parser/Parsing/Impl/DefinesStreamProxy.cpp
+index c2e20fb..b4983a8 100644
+--- a/src/Parser/Parsing/Impl/DefinesStreamProxy.cpp
++++ b/src/Parser/Parsing/Impl/DefinesStreamProxy.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/Parser/Parsing/Simple/Matcher/SimpleMatcherAnyCharacterBesides.cpp b/src/Parser/Parsing/Simple/Matcher/SimpleMatcherAnyCharacterBesides.cpp
+index c89d86d..0e919cd 100644
+--- a/src/Parser/Parsing/Simple/Matcher/SimpleMatcherAnyCharacterBesides.cpp
++++ b/src/Parser/Parsing/Simple/Matcher/SimpleMatcherAnyCharacterBesides.cpp
+@@ -0,0 +1 @@
++#include <algorithm>
+diff --git a/src/RawTemplater/Templating/Templater.cpp b/src/RawTemplater/Templating/Templater.cpp
+index c26d6d7..373b0c2 100644
+--- a/src/RawTemplater/Templating/Templater.cpp
++++ b/src/RawTemplater/Templating/Templater.cpp
+@@ -0,0 +1 @@
++#include <sstream>
+diff --git a/src/Unlinking/Unlinker.cpp b/src/Unlinking/Unlinker.cpp
+index a9e9896..26b860e 100644
+--- a/src/Unlinking/Unlinker.cpp
++++ b/src/Unlinking/Unlinker.cpp
+@@ -0,0 +1 @@
++#include <sstream>
+diff --git a/src/Utils/Utils/Arguments/UsageInformation.cpp b/src/Utils/Utils/Arguments/UsageInformation.cpp
+index e3f393a..e7be7b0 100644
+--- a/src/Utils/Utils/Arguments/UsageInformation.cpp
++++ b/src/Utils/Utils/Arguments/UsageInformation.cpp
+@@ -0,0 +1 @@
++#include <sstream>
+diff --git a/src/ZoneCode/Game/IW4/IW4_Commands.txt b/src/ZoneCode/Game/IW4/IW4_Commands.txt
+index 7a3cfd2..bac9a71 100644
+--- a/src/ZoneCode/Game/IW4/IW4_Commands.txt
++++ b/src/ZoneCode/Game/IW4/IW4_Commands.txt
+@@ -3 +3 @@ game IW4;
+-wordsize 32;
++wordsize 64;
+diff --git a/src/ZoneCode/Game/IW4/XAssets/snd_alias_list_t.txt b/src/ZoneCode/Game/IW4/XAssets/snd_alias_list_t.txt
+index cddb8cb..44a3440 100644
+--- a/src/ZoneCode/Game/IW4/XAssets/snd_alias_list_t.txt
++++ b/src/ZoneCode/Game/IW4/XAssets/snd_alias_list_t.txt
+@@ -29 +29,5 @@ set string dir;
+-set string name;
+\ No newline at end of file
++set string name;
++// Installed native64 speaker maps use variable 8-byte level records.
++use MSSChannelMap;
++set reusable speakers;
++set count speakers speakerCount;
+diff --git a/src/ZoneLoading/Game/IW4/ContentLoaderIW4.cpp b/src/ZoneLoading/Game/IW4/ContentLoaderIW4.cpp
+index 6f041a6..6060607 100644
+--- a/src/ZoneLoading/Game/IW4/ContentLoaderIW4.cpp
++++ b/src/ZoneLoading/Game/IW4/ContentLoaderIW4.cpp
+@@ -8,0 +9 @@
++
+@@ -27 +28 @@ void ContentLoader::LoadScriptStringList(const bool atStreamStart)
+-#ifdef ARCH_x86
++#if defined(ARCH_x86) || defined(ARCH_x64)
+@@ -115 +116 @@ void ContentLoader::LoadXAssetArray(const bool atStreamStart, const size_t count
+-#ifdef ARCH_x86
++#if defined(ARCH_x86) || defined(ARCH_x64)
+@@ -145 +146 @@ void ContentLoader::Load()
+-#ifdef ARCH_x86
++#if defined(ARCH_x86) || defined(ARCH_x64)
+@@ -166 +167 @@ void ContentLoader::Load()
+-#ifdef ARCH_x86
++#if defined(ARCH_x86) || defined(ARCH_x64)
+diff --git a/src/ZoneLoading/Game/IW4/ZoneLoaderFactoryIW4.cpp b/src/ZoneLoading/Game/IW4/ZoneLoaderFactoryIW4.cpp
+index 5186c48..8436888 100644
+--- a/src/ZoneLoading/Game/IW4/ZoneLoaderFactoryIW4.cpp
++++ b/src/ZoneLoading/Game/IW4/ZoneLoaderFactoryIW4.cpp
+@@ -61 +61 @@ namespace
+-                                                       .m_word_size = GameWordSize::ARCH_32,
++                                                       .m_word_size = GameWordSize::ARCH_64,
+@@ -81 +81 @@ namespace
+-                                                   .m_word_size = GameWordSize::ARCH_32,
++                                                   .m_word_size = GameWordSize::ARCH_64,
+@@ -98 +98 @@ namespace
+-                                                   .m_word_size = GameWordSize::ARCH_32,
++                                                   .m_word_size = GameWordSize::ARCH_64,
+@@ -314 +314 @@ std::unique_ptr<ZoneLoader> ZoneLoaderFactory::CreateLoaderForHeader(ZoneDataPee
+-            32u,
++            64u,
+@@ -318 +318,2 @@ std::unique_ptr<ZoneLoader> ZoneLoaderFactory::CreateLoaderForHeader(ZoneDataPee
+-            std::move(progressCallback)));
++            std::move(progressCallback),
++            32u));
+diff --git a/src/ZoneLoading/Loading/ContentLoaderBase.cpp b/src/ZoneLoading/Loading/ContentLoaderBase.cpp
+index 31055ea..5f0d6e1 100644
+--- a/src/ZoneLoading/Loading/ContentLoaderBase.cpp
++++ b/src/ZoneLoading/Loading/ContentLoaderBase.cpp
+@@ -48,2 +48 @@ void ContentLoaderBase::LoadXStringArray(const bool atStreamStart, const size_t
+-#ifdef ARCH_x86
+-    if (atStreamStart)
++    if (atStreamStart && m_stream.GetPointerBitCount() == sizeof(void*) * 8u)
+@@ -51,2 +50 @@ void ContentLoaderBase::LoadXStringArray(const bool atStreamStart, const size_t
+-#else
+-    if (atStreamStart)
++    else if (atStreamStart)
+@@ -62 +59,0 @@ void ContentLoaderBase::LoadXStringArray(const bool atStreamStart, const size_t
+-#endif
+diff --git a/src/ZoneLoading/Loading/Steps/StepLoadZoneContent.cpp b/src/ZoneLoading/Loading/Steps/StepLoadZoneContent.cpp
+index b4cbfb8..cee4dd6 100644
+--- a/src/ZoneLoading/Loading/Steps/StepLoadZoneContent.cpp
++++ b/src/ZoneLoading/Loading/Steps/StepLoadZoneContent.cpp
+@@ -15 +15,2 @@ namespace
+-                            std::optional<std::unique_ptr<ProgressCallback>> progressCallback)
++                            std::optional<std::unique_ptr<ProgressCallback>> progressCallback,
++                            const unsigned offsetBitCount)
+@@ -18,0 +20 @@ namespace
++              m_offset_bit_count(offsetBitCount),
+@@ -28 +30 @@ namespace
+-                m_pointer_bit_count, m_offset_block_bit_count, zoneLoader.m_blocks, m_insert_block, stream, m_memory, std::move(m_progress_callback));
++                m_pointer_bit_count, m_offset_block_bit_count, zoneLoader.m_blocks, m_insert_block, stream, m_memory, std::move(m_progress_callback), m_offset_bit_count);
+@@ -39,0 +42 @@ namespace
++        unsigned m_offset_bit_count;
+@@ -53 +56,2 @@ namespace step
+-                                                            std::optional<std::unique_ptr<ProgressCallback>> progressCallback)
++                                                            std::optional<std::unique_ptr<ProgressCallback>> progressCallback,
++                            const unsigned offsetBitCount)
+@@ -56 +60 @@ namespace step
+-            std::move(entryPointFactory), pointerBitCount, offsetBlockBitCount, insertBlock, memory, std::move(progressCallback));
++            std::move(entryPointFactory), pointerBitCount, offsetBlockBitCount, insertBlock, memory, std::move(progressCallback), offsetBitCount);
+diff --git a/src/ZoneLoading/Loading/Steps/StepLoadZoneContent.h b/src/ZoneLoading/Loading/Steps/StepLoadZoneContent.h
+index f832f1d..700fcef 100644
+--- a/src/ZoneLoading/Loading/Steps/StepLoadZoneContent.h
++++ b/src/ZoneLoading/Loading/Steps/StepLoadZoneContent.h
+@@ -17 +17,2 @@ namespace step
+-                                                            std::optional<std::unique_ptr<ProgressCallback>> progressCallback);
++                                                            std::optional<std::unique_ptr<ProgressCallback>> progressCallback,
++                                                            unsigned offsetBitCount = 0u);
+diff --git a/src/ZoneLoading/Zone/Stream/ZoneInputStream.cpp b/src/ZoneLoading/Zone/Stream/ZoneInputStream.cpp
+index 58b4465..542fc06 100644
+--- a/src/ZoneLoading/Zone/Stream/ZoneInputStream.cpp
++++ b/src/ZoneLoading/Zone/Stream/ZoneInputStream.cpp
+@@ -54 +54,2 @@ namespace
+-                          std::optional<std::unique_ptr<ProgressCallback>> progressCallback)
++                          std::optional<std::unique_ptr<ProgressCallback>> progressCallback,
++                          const unsigned offsetBitCount)
+@@ -60,3 +61,3 @@ namespace
+-              m_block_mask((std::numeric_limits<uintptr_t>::max() >> (sizeof(uintptr_t) * 8 - blockBitCount)) << (pointerBitCount - blockBitCount)),
+-              m_block_shift(pointerBitCount - blockBitCount),
+-              m_offset_mask(std::numeric_limits<uintptr_t>::max() >> (sizeof(uintptr_t) * 8 - (pointerBitCount - blockBitCount))),
++              m_block_mask((std::numeric_limits<uintptr_t>::max() >> (sizeof(uintptr_t) * 8 - blockBitCount)) << ((offsetBitCount ? offsetBitCount : pointerBitCount) - blockBitCount)),
++              m_block_shift((offsetBitCount ? offsetBitCount : pointerBitCount) - blockBitCount),
++              m_offset_mask(std::numeric_limits<uintptr_t>::max() >> (sizeof(uintptr_t) * 8 - ((offsetBitCount ? offsetBitCount : pointerBitCount) - blockBitCount))),
+@@ -68,0 +70 @@ namespace
++            assert(offsetBitCount == 0u || (offsetBitCount <= pointerBitCount && offsetBitCount > blockBitCount));
+@@ -122 +124 @@ namespace
+-        void* Alloc(const unsigned align) override
++        void* Alloc(const unsigned requestedAlign) override
+@@ -123,0 +126,3 @@ namespace
++            // The installed native64 IW4 loader retains legacy 4-byte block
++            // allocation alignment for structures now containing 8-byte fields.
++            const unsigned align = (m_pointer_byte_count == 8u && m_block_shift == 28u && requestedAlign == 8u) ? 4u : requestedAlign;
+@@ -177,0 +183 @@ namespace
++
+@@ -317,0 +324,3 @@ namespace
++            {
++                std::cerr << "Invalid native offset 0x" << std::hex << reinterpret_cast<uintptr_t>(offset)
++                          << " at stream " << std::dec << m_stream.Pos() << "\n";
+@@ -318,0 +328 @@ namespace
++            }
+@@ -336,0 +347,3 @@ namespace
++            {
++                std::cerr << "Invalid native offset 0x" << std::hex << reinterpret_cast<uintptr_t>(offset)
++                          << " at stream " << std::dec << m_stream.Pos() << "\n";
+@@ -337,0 +351 @@ namespace
++            }
+@@ -344 +358,11 @@ namespace
+-            return *reinterpret_cast<void**>(&block->m_buffer[blockOffset]);
++            auto* alias = *reinterpret_cast<void**>(&block->m_buffer[blockOffset]);
++            if (m_pointer_byte_count == 8u && (reinterpret_cast<uintptr_t>(alias) < 0x10000u || reinterpret_cast<uintptr_t>(alias) >= (uintptr_t{1} << 48u)))
++            {
++                std::ostringstream detail;
++                detail << "IW4 native64 invalid alias: encoded=0x" << std::hex << reinterpret_cast<uintptr_t>(offset)
++                       << " block=" << std::dec << blockNum << " offset=" << blockOffset
++                       << " cursor=" << m_block_offsets[blockNum] << " value=0x" << std::hex << reinterpret_cast<uintptr_t>(alias);
++                con::error("{}", detail.str());
++                throw InvalidOffsetBlockOffsetException(block, blockOffset);
++            }
++            return alias;
+@@ -371,0 +396,3 @@ namespace
++            {
++                std::cerr << "Invalid native offset 0x" << std::hex << reinterpret_cast<uintptr_t>(offset)
++                          << " at stream " << std::dec << m_stream.Pos() << "\n";
+@@ -372,0 +400 @@ namespace
++            }
+@@ -394,0 +423,3 @@ namespace
++            {
++                std::cerr << "Invalid native offset 0x" << std::hex << reinterpret_cast<uintptr_t>(offset)
++                          << " at stream " << std::dec << m_stream.Pos() << "\n";
+@@ -395,0 +427 @@ namespace
++            }
+@@ -523 +555,2 @@ std::unique_ptr<ZoneInputStream> ZoneInputStream::Create(const unsigned pointerB
+-                                                         std::optional<std::unique_ptr<ProgressCallback>> progressCallback)
++                                                         std::optional<std::unique_ptr<ProgressCallback>> progressCallback,
++                          const unsigned offsetBitCount)
+@@ -525 +558 @@ std::unique_ptr<ZoneInputStream> ZoneInputStream::Create(const unsigned pointerB
+-    return std::make_unique<XBlockInputStream>(pointerBitCount, blockBitCount, blocks, insertBlock, stream, memory, std::move(progressCallback));
++    return std::make_unique<XBlockInputStream>(pointerBitCount, blockBitCount, blocks, insertBlock, stream, memory, std::move(progressCallback), offsetBitCount);
+diff --git a/src/ZoneLoading/Zone/Stream/ZoneInputStream.h b/src/ZoneLoading/Zone/Stream/ZoneInputStream.h
+index 2007d7f..cb8ee50 100644
+--- a/src/ZoneLoading/Zone/Stream/ZoneInputStream.h
++++ b/src/ZoneLoading/Zone/Stream/ZoneInputStream.h
+@@ -249 +249,2 @@ public:
+-                                                   std::optional<std::unique_ptr<ProgressCallback>> progressCallback);
++                                                   std::optional<std::unique_ptr<ProgressCallback>> progressCallback,
++                                                   unsigned offsetBitCount = 0u);
+diff --git a/thirdparty/zlib.lua b/thirdparty/zlib.lua
+index 742a1f0..030683b 100644
+--- a/thirdparty/zlib.lua
++++ b/thirdparty/zlib.lua
+@@ -47 +47 @@ function zlib:project()
+-		filter "system:linux"
++		filter "system:linux or macosx"

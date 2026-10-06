@@ -1,0 +1,12 @@
+{
+  "result": "startup_crash_before_character",
+  "package": {
+    "files": {
+      "chr/c0000.esd.dcx": "2aeec5b3b8d1cb27145ed2c386e40dd18c7d94790bfe7cacc15aaa9853df001a",
+      "chr/c0000_a4x.anibnd.dcx": "bacbcabc047fea16b1adb3bdfec8e52e931349360b7a4030289b0c16ba4890cc",
+      "chr/c0000.anibnd.dcx": "0cdf624c891742549114e1dd096c869cfcf4f2fb77f025446b1e26c2a01ea69d",
+      "parts/WP_A_1401.partsbnd.dcx": "15a392823853e3e51d22d7c9d4615a1c4319a494236970779ce8949e60cc377e"
+    }
+  },
+  "scope": "Sanitized asset fingerprints only; reject an observed crashing historical package."
+}

@@ -1,0 +1,18 @@
+IW4L — copyright 2026 vladtrc.
+Original project: https://github.com/vladtrc/iw4L
+Reviewed fork: https://github.com/chasmlol/2010-rust-rewrite-mashup
+Pinned commit: f608f85e407ff1b7689d54a9aafdd16e95711ac4
+Source: crates/weapon_iw4/src/kick.rs
+License: Apache License, Version 2.0; full text in IW4L-LICENSE-2.0.txt.
+
+native/src/iw4_view_kick.cpp is a modified C++ adaptation of the view component
+of weapon_fire_recoil, kick_angles_step_axis and kick_angles. The M9 controller
+supplies the source weapon values and a confirmed native-shot receipt.
+Adaptation changes: bounded input validation, M9-only/no-perk interface, C++ state
+storage. The source implementation is a rewrite reference, not a claim that
+these native DSR callbacks have been exercised or that all retail IW4 behavior
+has been independently verified.
+
+No Bevy renderer, Minecraft/Skate code, fonts or other components of the fork are
+included. No game assets are distributed. Native DSR projectile collision and
+damage remain the target backend; this component computes view angles only.

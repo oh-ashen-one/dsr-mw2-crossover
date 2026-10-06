@@ -1,0 +1,25 @@
+DSR × MW2 Crossover
+Copyright (c) 2026 oh-ashen-one and project contributors.
+
+Unless a file or this notice specifies otherwise, the original source in this
+repository is licensed under the GNU General Public License, version 3 only.
+See LICENSE for the full terms.
+
+native/src/iw4_view_kick.cpp adapts IW4L view-kick code by vladtrc under the
+Apache License 2.0. The original attribution, modification description and
+full license are preserved in native/third_party/IW4L-NOTICE.txt and
+native/third_party/IW4L-LICENSE-2.0.txt. Retain them when redistributing.
+
+tools/oat-macos.patch and tools/oat-mw2-native64.patch modify OpenAssetTools
+by Laupetin and contributors, licensed under GPL version 3. The full upstream
+license is preserved in tools/OAT-LICENSE-GPL-3.0.txt. The native64 patch
+includes the macOS patch; do not apply both.
+
+External dependencies and research references have their own licenses; see
+CREDITS.md. Their complete implementations are not vendored here.
+
+Dark Souls Remastered and Call of Duty: Modern Warfare 2 (2009), their assets,
+characters, sounds, animations and trademarks belong to their respective
+rights holders. No retail assets or game binaries are distributed. This
+project's source license grants no rights to those materials. This is an
+unofficial project with no publisher endorsement.

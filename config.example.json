@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "crossover_app": "/Applications/CrossOver.app",
+  "mw2_root": "retail/Call of Duty Modern Warfare 2",
+  "source_steam": "retail/Steam",
+  "gpu_dir": "tooling-local/gpu",
+  "allow_offline_conversion": false,
+  "allow_owner_test": false,
+  "allow_agent_gameplay": false
+}

@@ -1,0 +1,17 @@
+# Source-only candidate. Do not run until the exact loader binaries are approved,
+# a copied DSR install and isolated save profile exist, and the renderer slot is held.
+[modengine]
+debug = false
+crash_reporting = false
+external_dll_discovery = false
+external_dlls = []
+
+[extension.mod_loader]
+enabled = true
+loose_params = false
+mods = [
+    { enabled = true, name = "dsr-mw2", path = "mod" }
+]
+
+[extension.scylla_hide]
+enabled = false

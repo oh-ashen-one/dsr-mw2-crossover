@@ -1,0 +1,46 @@
+{
+  "release": "0.1.0 source preview",
+  "date": "2026-10-06",
+  "environment": {
+    "os": "Darwin",
+    "architecture": "arm64",
+    "python": "3.14.7"
+  },
+  "python_tests": {
+    "passed": 200,
+    "failed": 0,
+    "environment": "isolated venv with only the existing trusted Pillow 12.3.0 dependency copied locally",
+    "retail_data_required": false
+  },
+  "native_source_checks": {
+    "snapshot_fixture_checks": 19,
+    "handling_inventory_fixture_checks": 155,
+    "input_lifecycle_fixture_checks": 23,
+    "additional_fixtures": [
+      "magazine",
+      "aim_latch",
+      "recoil_delta"
+    ],
+    "sanitizers": [
+      "address",
+      "undefined"
+    ],
+    "windows_observer_probe_and_xinput_compiled": true,
+    "compiled_windows_binaries_executed": false
+  },
+  "release_boundaries": {
+    "private_history_included": false,
+    "retail_assets_included": false,
+    "save_or_account_data_included": false,
+    "game_launched": false,
+    "profile_accessed_for_tests": false
+  },
+  "runtime_verified": false,
+  "limits": [
+    "Latest native first-person integration unverified",
+    "Physical DualSense response unverified",
+    "Boss/death/reset/performance acceptance pending",
+    "Fresh-machine asset/profile reproduction not performed during publication"
+  ],
+  "publication_audit": "Run tools/check_public_release.py and CI against this revision; compiled outputs and private receipts remain ignored."
+}
