@@ -2,6 +2,30 @@
 
 Updated 2026-10-06. Branch: `codex/controller-aim-repair`. **Work in progress; controller and repeated Intervention firing are not accepted as fixed.**
 
+## Claude update — 2026-10-06 evening
+
+Owner session evidence (native logs, sliced at the last two `input_lookup_empty_guard` markers):
+
+- **Death never triggers.** In the session before last, four boss hits took HP 594→491→273→89→0. No death animation played and the character froze. The game then saved at HP 0: the latest session loaded with HP 0 on every sample. Because the custom gun layer only installs when the snapshot reads HP > 0 (`xinput_observer.cpp` frame gate), it never installed in that session.
+- **Repeat fire looks fixed natively, but is unverified with the gun layer active.** With the action-priority repair installed, native ammo went 54→45 (eight Intervention decrements, one M9). All of that was at HP 0 with the gun layer absent. The earlier failure (fire requests yielding hold animation 465500 with no decrement) happened while alive.
+- **Controller inputs reach DSR while focused:** Cross, D-pad Right weapon swaps (9200000↔9100000), both sticks and both triggers. Full native action response is still owner-unconfirmed.
+- **Aim (precision hold) was not held at any of the four hits**, so the forced precision mode is not the cause.
+
+Player ESD structure (`chr/c0000.esd.dcx`):
+- Machine 0 is the passive/master machine. Its state 0 enters with `SwitchActiveActionState(1)`, and it alone holds the HP/death checks (`GetHP() < 0`, `GetStateChangeType(117/136)`) and every damage dispatch.
+- Machine 1 is the action machine; it has no HP checks. Gun states 9000–9003 exist only in machine 1.
+- Machine 0 lacks death checks in states 1, 16, 57–95, 97–103, 105–109, 111–112, 114–215 and 219–224. The zombie state requires machine 0 to have been somewhere without a death check when HP reached 0. Which state is not yet known.
+- The builder comment "Native damage/evade interrupt handling remains available during reload" is wrong: `states[70].conditions[:1]` is the chain-attack request group.
+
+New diagnostic (this push):
+- `native/include/esd_state_probe.hpp` is a read-only, budgeted (256 reads per XInput call) breadth-first search from the player instance. It finds live EzState records by signature (id plus condition/enter/exit/ongoing counts; all 506 machine/state signatures are unique) and re-reads each holder path.
+- Owner sessions log `esd_holder`, `esd_probe`, `esd_state` (every change, with live HP) and `esd_heartbeat` lines to `native-input-v1.jsonl`.
+- Windows reads are region-checked with `VirtualQuery`, which skips guard/no-access pages.
+- `tools/build_esd_state_table.py` generates `native/include/esd_state_table.hpp` from your installed ESD; that header is git-ignored in the public export. `tools/check_esd_state_probe.py` runs the synthetic-memory tests under ASan/UBSan.
+- The launcher's renderer gate no longer treats the Unity CLI/MCP bridge (`~/.unity/bin/unity`) as a renderer; Unity editors still block launch.
+
+Next: after the owner's new-game session, read the `esd_state` trace around the first HP drop and around HP 0. Find the machine-0 state that lacks a death check, then fix the gun-state interaction that strands it there. Do not script HP or deaths.
+
 ## Goal and boundaries
 
 Native Dark Souls Remastered, its enemies and bosses, with authentic MW2 (2009) guns, aiming, reloads and custom loadouts. No PTDE substitution, lookalikes, alternate engine or scripted HP damage. The owner rejected the earlier low-quality handgun/crossbow presentation. Current first-person M9 and Intervention assets are authentic local conversions; full MW2 parity is unfinished.

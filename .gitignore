@@ -48,3 +48,6 @@ __pycache__/
 *.7z
 *.log
 .DS_Store
+
+# Generated from your own installed chr/c0000.esd.dcx by tools/build_esd_state_table.py
+native/include/esd_state_table.hpp

@@ -34,6 +34,14 @@ OWNER_RESERVATION = "OWNER RESERVATION: DSR-MW2 startup and owner play; backgrou
 M9_MODES = {'m9', 'm9-test'}
 
 
+def is_engine(name: str) -> bool:
+    path = name.replace("\\", "/")
+    # ~/.unity/bin/unity is the Unity command-line/MCP bridge, not an editor or renderer.
+    if path.lower().endswith("/.unity/bin/unity"):
+        return False
+    return path.split("/")[-1].lower() in ENGINES
+
+
 def native_input_trial(mode: str) -> bool:
     return mode == 'm9-test' and os.environ.get('DSR_MW2_NATIVE_INPUT_TRIAL') == 'validation-v1'
 
@@ -93,7 +101,7 @@ def preflight(mode: str) -> dict:
     if chip != "Apple M3 Ultra":
         blockers.append("This launcher is configured for the M3 Ultra Studio")
     for pid, state, name in processes():
-        if mode != "steam-login" and name.replace("\\", "/").split("/")[-1].lower() in ENGINES:
+        if mode != "steam-login" and is_engine(name):
             blockers.append(f"Another game or renderer is active (PID {pid}); it will not be interrupted")
     if bottle_processes():
         blockers.append("A process already owns this private bottle; preserve it before a fresh offline launch")

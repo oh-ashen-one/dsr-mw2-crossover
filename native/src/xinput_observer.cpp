@@ -19,6 +19,7 @@
 #include "m9_camera_angles.hpp"
 #include "viewmodel_renderer.hpp"
 #include "shot_audio.hpp"
+#include "esd_state_table.hpp"
 
 namespace {
 INIT_ONCE once=INIT_ONCE_STATIC_INIT;
@@ -670,6 +671,85 @@ BOOL CALLBACK initialize(PINIT_ONCE,PVOID,PVOID*) {
     }
     return TRUE;
 }
+// Read-only ESD state trace (owner sessions only): discovers the player's live
+// EzState records by signature, then logs every machine-0/machine-1 state change
+// with the live HP. Region-checked reads never touch guard/no-access pages.
+struct ProbeReader final:dsr_mw2::Reader {
+    struct Region{std::uintptr_t base,end;bool ok;};
+    mutable Region cache[64]{};mutable unsigned next=0;
+    void clear(){for(auto& r:cache)r={0,0,false};next=0;}
+    bool readable(std::uintptr_t at,std::size_t n)const{
+        for(const auto& r:cache)if(r.end&&at>=r.base&&at<r.end)return r.ok&&n<=r.end-at;
+        MEMORY_BASIC_INFORMATION m{};
+        if(!VirtualQuery(reinterpret_cast<void*>(at),&m,sizeof(m)))return false;
+        const DWORD access=PAGE_READONLY|PAGE_READWRITE|PAGE_WRITECOPY|PAGE_EXECUTE_READ|PAGE_EXECUTE_READWRITE|PAGE_EXECUTE_WRITECOPY;
+        const bool ok=m.State==MEM_COMMIT&&(m.Protect&access)&&!(m.Protect&(PAGE_GUARD|PAGE_NOACCESS));
+        const auto base=reinterpret_cast<std::uintptr_t>(m.BaseAddress);
+        cache[next++%64]={base,base+m.RegionSize,ok};
+        return ok&&n<=base+m.RegionSize-at;
+    }
+    bool read(dsr_mw2::Address at,void* dst,std::size_t bytes)const override {
+        if(!readable(static_cast<std::uintptr_t>(at),bytes))return false;
+        SIZE_T n=0;return ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(at),dst,bytes,&n)&&n==bytes;
+    }
+};
+dsr_mw2::EsdStateProbe esd_probe{dsr_mw2::esd_state_table,sizeof(dsr_mw2::esd_state_table)/sizeof(dsr_mw2::esd_state_table[0]),dsr_mw2::esd_state_span};
+ProbeReader esd_reader;
+dsr_mw2::Address esd_root=0;
+std::size_t esd_logged=0;
+bool esd_finish_logged=false;
+ULONGLONG esd_started=0,esd_retry_at=0,esd_cache_at=0,esd_heartbeat=0,esd_window=0;
+unsigned esd_lines=0,esd_suppressed=0;
+void esd_write(const char* text,int n){
+    if(n>0&&log_file!=INVALID_HANDLE_VALUE){DWORD written=0;WriteFile(log_file,text,static_cast<DWORD>(n),&written,nullptr);}
+}
+void esd_tick(ULONGLONG now){
+    if(!owner_session||!esd_root)return;
+    if(esd_root!=esd_probe.root()||(esd_retry_at&&now>=esd_retry_at)){
+        esd_reader.clear();esd_probe.reset(esd_root);esd_logged=0;esd_finish_logged=false;
+        esd_started=now;esd_retry_at=0;esd_cache_at=now;
+    }
+    if(now-esd_cache_at>=2000){esd_reader.clear();esd_cache_at=now;}
+    if(!esd_probe.finished())esd_probe.step(esd_reader,256);
+    char line[512];
+    while(esd_logged<esd_probe.holders()){
+        const auto& h=esd_probe.holder(esd_logged);
+        char path[96]{};int at=0;
+        for(std::uint8_t k=0;k<h.length&&at<80;++k)at+=std::snprintf(path+at,sizeof(path)-static_cast<std::size_t>(at),"%s%u",k?",":"",static_cast<unsigned>(h.path[k]));
+        esd_write(line,std::snprintf(line,sizeof(line),"{\"kind\":\"esd_holder\",\"ms\":%llu,\"holder\":%zu,\"path\":[%s],\"machine\":%d,\"state\":%d,\"root\":\"%llx\"}\n",
+            now,esd_logged,path,h.last.machine,h.last.state,static_cast<unsigned long long>(esd_root)));
+        ++esd_logged;
+    }
+    if(esd_probe.finished()&&!esd_finish_logged){
+        esd_finish_logged=true;
+        esd_write(line,std::snprintf(line,sizeof(line),"{\"kind\":\"esd_probe\",\"ms\":%llu,\"status\":\"%s\",\"holders\":%zu,\"nodes\":%zu,\"reads\":%zu,\"internal\":%zu,\"elapsed_ms\":%llu}\n",
+            now,esd_probe.holders()?"finished":"not_found",esd_probe.holders(),esd_probe.nodes(),esd_probe.reads(),esd_probe.internal(),now-esd_started));
+        if(!esd_probe.holders())esd_retry_at=now+30000;
+    }
+    if(!esd_logged)return;
+    if(now-esd_window>=1000){
+        if(esd_suppressed)esd_write(line,std::snprintf(line,sizeof(line),"{\"kind\":\"esd_suppressed\",\"ms\":%llu,\"lines\":%u}\n",now,esd_suppressed));
+        esd_window=now;esd_lines=0;esd_suppressed=0;
+    }
+    std::uint32_t hp=0;const bool hp_read=esd_reader.get(esd_root,0x3e8,hp);
+    for(std::size_t i=0;i<esd_logged;++i){
+        auto& h=esd_probe.holder(i);
+        const auto hit=esd_probe.resolve(esd_reader,i);
+        if(hit==h.last)continue;
+        if(esd_lines>=60){++esd_suppressed;continue;}
+        ++esd_lines;
+        esd_write(line,std::snprintf(line,sizeof(line),"{\"kind\":\"esd_state\",\"ms\":%llu,\"holder\":%zu,\"machine\":%d,\"state\":%d,\"from_machine\":%d,\"from\":%d,\"hp\":%d}\n",
+            now,i,hit.machine,hit.state,h.last.machine,h.last.state,hp_read?static_cast<int>(hp):-1));
+        h.last=hit;
+    }
+    if(now-esd_heartbeat>=5000){
+        esd_heartbeat=now;
+        char states[24*16]{};int at=0;
+        for(std::size_t i=0;i<esd_logged&&at<static_cast<int>(sizeof(states))-16;++i)
+            at+=std::snprintf(states+at,sizeof(states)-static_cast<std::size_t>(at),"%s[%d,%d]",i?",":"",esd_probe.holder(i).last.machine,esd_probe.holder(i).last.state);
+        esd_write(line,std::snprintf(line,sizeof(line),"{\"kind\":\"esd_heartbeat\",\"ms\":%llu,\"hp\":%d,\"states\":[%s]}\n",now,hp_read?static_cast<int>(hp):-1,states));
+    }
+}
 void sample(DWORD slot,DWORD result,const XINPUT_STATE* state,dsr_mw2::Address caller) {
     AcquireSRWLockExclusive(&controller_lock);
     if(result==ERROR_SUCCESS&&state&&(controller_slot==slot||controller_slot>=4||GetTickCount64()-controller_stamp>=250)){
@@ -679,10 +759,12 @@ void sample(DWORD slot,DWORD result,const XINPUT_STATE* state,dsr_mw2::Address c
     if(log_file==INVALID_HANDLE_VALUE || !TryAcquireSRWLockExclusive(&log_lock))return;
     ++calls;
     const auto now=GetTickCount64();
+    esd_tick(now);
     if(now-last_sample>=500) {
         last_sample=now;
         LocalReader reader;dsr_mw2::Snapshot s;
         const auto status=dsr_mw2::observe(reader,reinterpret_cast<dsr_mw2::Address>(GetModuleHandleW(nullptr)),s);
+        if(status==dsr_mw2::ReadStatus::ok)esd_root=s.player;
         const auto base=reinterpret_cast<dsr_mw2::Address>(GetModuleHandleW(nullptr));
         DWORD foreground=0;GetWindowThreadProcessId(GetForegroundWindow(),&foreground);
         if(frame_enabled&&!frame_attempted&&status==dsr_mw2::ReadStatus::ok&&s.hp&&dsr_mw2::is_m9(s.right_weapon)&&

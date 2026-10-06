@@ -151,6 +151,12 @@ class LaunchGateTests(unittest.TestCase):
             self.assertEqual(alias.resolve(), launch.BOTTLE/'drive_c/Games/DSR-MW2')
             config.assert_called_once_with(launch.STEAM/'config/loginusers.vdf', offline=True)
 
+    def test_unity_cli_bridge_is_not_a_renderer_but_editors_are(self):
+        self.assertFalse(launch.is_engine(str(Path.home() / '.unity/bin/unity')))
+        self.assertTrue(launch.is_engine('/Applications/Unity/Hub/Editor/6000.0.1f1/Unity.app/Contents/MacOS/Unity'))
+        self.assertTrue(launch.is_engine('C:\\Games\\DSR-MW2\\DarkSoulsRemastered.exe'))
+        self.assertFalse(launch.is_engine('/usr/bin/python3'))
+
     def test_only_exact_dsr_owner_reservation_is_accepted(self):
         with tempfile.TemporaryDirectory() as temp, patch.object(launch, "GPU", Path(temp)):
             pause = Path(temp) / "PAUSED"
