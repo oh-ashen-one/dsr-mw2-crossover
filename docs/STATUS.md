@@ -12,7 +12,7 @@ This release preserves the current M9 source build. It is not a claim of a compl
 | Aim/recoil/audio | Native precision-aim ownership, confirmed-shot recoil and original M9 shot audio observed in earlier tests. These are bounded findings, not full MW2 behavior parity. |
 | Armory | Earlier native test purchased the suppressor variant, equipped it in either right-hand slot and confirmed native save persistence. Appearance only: no distinct suppressed audio/range. |
 | New first-person renderer | Original D3D11 source compiles. Source-asset packet, static hook contracts and HLSL stages were checked offline. Actual rendering/state restoration in DSR remains unverified. |
-| Physical PS5 controller | Private WineBus correction and XInput mapping prepared; physical button response remains unverified. |
+| Physical PS5 controller | A package forwarding bug was reproduced and corrected: the renamed retail backend returned disconnected while CrossOver system XInput1.4 detected slot 0. Ten corrected console samples match system state/capabilities. Physical buttons and Steam overlay interaction inside DSR remain unverified. |
 | Window management | Original external helper enables resize borders and foreground-only size/minimize shortcuts. A hidden-window CrossOver fixture passed without opening DSR. Actual DSR resizing and shortcuts remain unverified. |
 | Boss/death/reset/performance | Full repeatable boss encounter, death/restart/defeat, long-session behavior and performance remain unverified. |
 

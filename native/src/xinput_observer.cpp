@@ -1,4 +1,4 @@
-// Original input-boundary observer. Exact retail backend, untouched outputs.
+// Original input-boundary observer. CrossOver system input, untouched outputs.
 // Optional exact-entry frame observation is separately gated and time-bounded.
 // No controller emulation, inventory write or worker thread.
 #define WIN32_LEAN_AND_MEAN
@@ -568,8 +568,10 @@ void frame_sample(const dsr_mw2::EntryRegisters& registers){
     ReleaseSRWLockExclusive(&frame_lock);
 }
 BOOL CALLBACK initialize(PINIT_ONCE,PVOID,PVOID*) {
-    // Load an explicit private backend path, never a system search or download.
-    backend=LoadLibraryW(L"C:\\Games\\DSR-MW2\\xinput1_3_backend.dll");
+    // The renamed retail Windows DLL cannot see Wine's controller devices.
+    // Use the installed CrossOver system module, as the other input exports do.
+    // A different basename prevents recursion into this xinput1_3 proxy.
+    backend=LoadLibraryW(L"C:\\windows\\system32\\xinput1_4.dll");
     if(backend){
         const auto p=GetProcAddress(backend,"XInputGetState");
         static_assert(sizeof(p)==sizeof(get_state));

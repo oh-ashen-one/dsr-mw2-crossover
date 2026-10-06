@@ -1,7 +1,8 @@
 """Build/install/restore our original passthrough for disposable input validation.
 
-Only the private candidate is mutable. Backend bytes are the hash-pinned retail
-DLL already approved with the game; every export except GetState is forwarded.
+Only the private candidate is mutable. Preserved backend bytes are the hash-pinned
+retail DLL. Controller APIs use the installed CrossOver XInput 1.4 module; only
+legacy audio/guide ordinals absent from Wine retain retail forwarding.
 GetState forwards unchanged. A separately gated, bounded frame-entry observer
 can patch the exact local prologue, record arguments and restore it. No writer.
 """
@@ -47,10 +48,13 @@ def build():
     (OUT/'pe.txt').write_text(imports)
     for forbidden in ('WriteProcessMemory','CreateRemoteThread','DebugActiveProcess','SetThreadContext','SendInput','CreateProcessW'):
         if forbidden in imports:raise ValueError('Unexpected mutation/debug/input API: '+forbidden)
-    for name in ('XInputGetState','xinput1_3_backend.XInputSetState','xinput1_3_backend.#100'):
+    for name in ('XInputGetState','xinput1_4.XInputSetState','xinput1_4.XInputGetCapabilities',
+                 'xinput1_4.XInputEnable','xinput1_4.XInputGetBatteryInformation',
+                 'xinput1_4.XInputGetKeystroke','xinput1_4.#100'):
         if name not in imports:raise ValueError('Missing passthrough: '+name)
     report={'at':datetime.now(timezone.utc).isoformat(),'sha256':sha(binary),
             'sources':{s:sha(ROOT/s) for s in SOURCES},'retail_backend_sha256':RUNTIME_HASHES['xinput1_3.dll'],
+            'controller_backend':'installed CrossOver system32/xinput1_4.dll; unchanged state/capabilities',
             'input_modified':'only explicit play-v1 scoped M9 gun trial','memory_hooks':'exact entries only; observe-v1 frame 30 seconds; observe-v2 entries 60 seconds; observe-v3 typed post-input/ammo 90 seconds; play-v1 integrated gun trial 180 seconds; explicit bonfire-v1 plus loadout-600s-v1 session 600 seconds',
             'owner_test_limit_ms':7200000,'viewmodel_trial':'source-vm-v1; exact native render/visibility hooks; D3D11 deferred commands',
             'inventory_writes':False,'runtime_verified':False}
