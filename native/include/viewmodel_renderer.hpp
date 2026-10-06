@@ -7,12 +7,14 @@ struct VmState {
     int weapon=0,animation=-1,loaded=0;
     float elapsed=0;
     bool visible=false;
+    bool reloading=false,empty_reload=false;
+    float reload_elapsed=0,ads=1;
 };
 // Original renderer only. Receives immutable combat observations. It cannot
 // create a shot, change health/ammo, move the camera or control game input.
 void vm_publish(const VmState& state);
 void vm_native_shot(bool last_round);
-bool vm_load(const wchar_t* file);
+bool vm_load(const wchar_t* file,bool sniper=false);
 void vm_render(void* swap_chain);
 bool vm_visible(std::uint64_t player);
 void vm_stop();

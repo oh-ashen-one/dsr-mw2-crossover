@@ -3,7 +3,7 @@
 namespace dsr_mw2 {
 bool is_m9(std::int32_t id) {
     // Standalone bonfire-armory suppressor variant; no invented upgrade range.
-    if(id==9100000)return true;
+    if(id==9100000||id==9200000)return true;
     // Exact native Light Crossbow family records. Reinforcement occupies +0..15.
     // The PARAM audit, not this predicate, decides which upgrade levels exist.
     for (const int root : {1250000, 1250100, 1250200, 1250400, 1250600, 1250800})

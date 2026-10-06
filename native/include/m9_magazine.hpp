@@ -24,6 +24,7 @@ struct MagazineFrame {
 class M9Magazine {
 public:
     int loaded=0;bool fault=false,reloading=false,credited=false;
+    double reload_elapsed=0;bool empty_reload=false;
     int step(const MagazineFrame& f){
         // A death/unload cannot retain rounds or an in-flight reload credit.
         // Focus loss only disarms input; native total still bounds the magazine.
@@ -36,7 +37,10 @@ public:
         fire=f.fire;reload=f.reload;
         if(f.hp<hp||f.interrupted){cancel();hp=f.hp;return 0;}hp=f.hp;
         if(fault)return 0;
+        const bool sniper=(f.loadout>>1)==9200000;
+        const int capacity=sniper?5:15;
         if(reloading){
+            reload_elapsed=std::max(0.,f.now-request_time);
             if(f.animation==reload_animation){
                 if(!seen){seen=true;last_progress=-1;}
                 else if(last_progress<0){
@@ -46,20 +50,29 @@ public:
                 }else if(!std::isfinite(f.elapsed)||f.elapsed+.001<last_progress||f.elapsed-last_progress>.25)cancel();
                 else{
                     last_progress=f.elapsed;
-                    if(!credited&&f.elapsed>=1.2){loaded=std::min(15,f.total);credited=true;}
+                    if(f.elapsed>=1.2)native_reload_verified=true;
+                    if(!sniper&&!credited&&native_reload_verified){loaded=std::min(capacity,f.total);credited=true;}
                 }
             }else if(seen){
-                // Ending or interruption never fabricates progress/ammo credit.
-                cancel();
+                // The native clip can finish before the longer authored MW2
+                // reload. Only a verified uninterrupted reload may continue.
+                if(!(sniper&&native_reload_verified&&(f.animation<0||f.animation==465500)))cancel();
             }else if(f.now-request_time>.3)cancel();
+            if(sniper&&reloading&&native_reload_verified){
+                if(!credited&&reload_elapsed>=1.8){loaded=std::min(capacity,f.total);credited=true;}
+                if(reload_elapsed>=(empty_reload?3.867:2.268))cancel();
+            }
             return 0;
         }
         const bool ready=f.animation<0||f.animation==465500||(f.animation==463000&&f.elapsed>=.08);
-        if(reload_edge&&loaded<std::min(15,f.total)&&ready){
+        // An empty trigger press starts a real reload rather than silently
+        // doing nothing. Native animation acknowledgement still gates credit.
+        if((reload_edge||(fire_edge&&loaded==0))&&loaded<std::min(capacity,f.total)&&ready){
             reloading=true;seen=false;credited=false;last_progress=-1;request_time=f.now;
+            native_reload_verified=false;reload_elapsed=0;empty_reload=loaded==0;
             reload_animation=loaded?465502:465501;return loaded?38:39;
         }
-        if(fire_edge&&loaded>0&&ready&&f.now-last_shot>=.08)return 37;
+        if(fire_edge&&loaded>0&&ready&&f.now-last_shot>=(sniper?.916:.08))return 37;
         return 0;
     }
     void consume(std::uint64_t actor,int before,int after,int result,double now){
@@ -72,10 +85,11 @@ public:
         if(loaded<=0){loaded=0;armed=false;cancel();last_shot=now;return;}
         --loaded;last_shot=now;
     }
-    void cancel(){reloading=false;seen=false;credited=false;last_progress=-1;}
+    void cancel(){reloading=false;seen=false;credited=false;native_reload_verified=false;last_progress=-1;}
 private:
     std::uint64_t player=0,loadout=0;int hp=0,reload_animation=-1;
     bool armed=false,fire=false,reload=false,seen=false;
+    bool native_reload_verified=false;
     double last_shot=-10,request_time=0,last_progress=-1;
 };
 }

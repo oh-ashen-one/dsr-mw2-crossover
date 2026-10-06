@@ -22,7 +22,7 @@ from .asset_provenance import verify
 WORKSPACE = Path(__file__).resolve().parents[1]
 
 
-def make_meshes(model, geometry: dict, scale: float = .0254, *, include_suppressor: bool = False, grip=(0., 0., 0.)):
+def make_meshes(model, geometry: dict, scale: float = .0254, *, include_suppressor: bool = False, grip=(0., 0., 0.), material_stems=None):
     import numpy as np
     from soulstruct.flver.face_set import FaceSet
     from soulstruct.flver.vertex_array import VertexArray
@@ -39,7 +39,9 @@ def make_meshes(model, geometry: dict, scale: float = .0254, *, include_suppress
         suppressor = material_name == "mc/mtl_weapon_suppressor_b"
         if suppressor and not include_suppressor:
             continue
-        if material_name not in ("mc/mtl_weapon_beretta", "mtl_weapon_beretta", "mc/mtl_weapon_suppressor_b"):
+        if material_stems is not None and material_name not in material_stems:
+            raise ValueError('Unverified source material: '+material_name)
+        if material_stems is None and material_name not in ("mc/mtl_weapon_beretta", "mtl_weapon_beretta", "mc/mtl_weapon_suppressor_b"):
             raise ValueError(f"Unverified M9 material association: {material_name}")
         mapping, vertices, triangles = {}, [], []
         for face in faces:
@@ -98,6 +100,12 @@ def make_meshes(model, geometry: dict, scale: float = .0254, *, include_suppress
                 if texture.path:
                     suffix = "_n" if texture.texture_type == "g_Bumpmap" else "_s" if texture.texture_type == "g_Specular" else ""
                     texture.path = "WP_A_1401_suppressor" + suffix + ".tga"
+        if material_stems is not None:
+            mesh.material.name=material_name
+            for texture in mesh.material.textures:
+                if texture.path:
+                    suffix='_n' if texture.texture_type=='g_Bumpmap' else '_s' if texture.texture_type=='g_Specular' else ''
+                    texture.path=material_stems[material_name]+suffix+'.tga'
         mesh.face_sets = [FaceSet(s.flags, False, s.use_backface_culling, s.unk_x06, np.asarray(triangles, dtype=np.uint32)) for s in source.face_sets]
         meshes.append(mesh)
     model.meshes = meshes

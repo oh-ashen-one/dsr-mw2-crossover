@@ -27,6 +27,7 @@ def main(console=False):
     test=OUT/'packet-test'
     subprocess.run(['/usr/bin/clang++',*flags,'-g','-fsanitize=address,undefined',str(ROOT/'native/tests/viewmodel_packet_test.cpp'),'-o',str(test)],check=True)
     result=json.loads(subprocess.check_output([test,ROOT/'converted/mw2-2009/viewmodel-v1/m9.dsrvm'],text=True))
+    sniper=json.loads(subprocess.check_output([test,ROOT/'converted/mw2-2009/intervention-viewmodel-v1/intervention.dsrvm'],text=True))
     image=(ROOT/'tooling-local/native-research'/SHA/'DarkSoulsRemastered.exe').read_bytes()
     if hashlib.sha256(image).hexdigest()!=SHA:raise ValueError('Static image changed')
     pe=PEImage(image)
@@ -38,7 +39,7 @@ def main(console=False):
     }
     for name,(rva,expected) in contracts.items():
         if pe.at(rva,len(bytes.fromhex(expected))).hex()!=expected:raise ValueError('Native render contract differs: '+name)
-    report={'at':datetime.now(timezone.utc).isoformat(),'sanitized_packet_test':result,'retail_exe_sha256':SHA,
+    report={'at':datetime.now(timezone.utc).isoformat(),'sanitized_packet_test':result,'sanitized_intervention_packet_test':sniper,'retail_exe_sha256':SHA,
             'static_contracts':{k:{'rva':hex(v[0]),'bytes_match':True} for k,v in contracts.items()},
             'game_launched':False,'renderer_started':False,'runtime_verified':False}
     shader=OUT/'shader-check.exe'

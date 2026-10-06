@@ -6,6 +6,7 @@
 #include <array>
 #include <cstring>
 #include "entry_observer.hpp"
+#include "input_lookup_guard.hpp"
 
 extern "C" void DsrEntryObserverShim0();
 extern "C" void DsrEntryObserverShim1();
@@ -77,6 +78,29 @@ extern "C" void DsrEntryObserverRecord(const dsr_mw2::EntryRegisters* regs,unsig
     if(index<slots.size()&&slots[index].notify&&regs)slots[index].notify(*regs);
 }
 namespace dsr_mw2 {
+bool install_input_lookup_guard(std::uintptr_t base){
+    static Slot guard;
+    if(guard.published)return true;
+    const auto* completion=reinterpret_cast<const void*>(base+0x54c618);
+    constexpr unsigned char completion_prefix[]={0x48,0x8b,0x56,0x08,0x48,0x8b,0x0e};
+    auto* target=reinterpret_cast<void*>(base+0x54c4c4);
+    if(std::memcmp(target,input_lookup_prefix.data(),input_lookup_prefix.size())||
+       std::memcmp(completion,completion_prefix,sizeof(completion_prefix)))return false;
+    auto* executable=VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE);
+    if(!executable)return false;
+    const auto code=input_lookup_code(base+0x54c4d7,base+0x54c618);
+    std::memcpy(executable,code.data(),code.size());DWORD old=0;
+    if(!VirtualProtect(executable,4096,PAGE_EXECUTE_READ,&old)||
+       !FlushInstructionCache(GetCurrentProcess(),executable,code.size())){
+        VirtualFree(executable,0,MEM_RELEASE);return false;
+    }
+    guard.entry=target;guard.patch.fill(0x90);jump(guard.patch.data(),executable);
+    // Reuse the existing thread-freeze and exact-byte replacement protocol.
+    // A published executable page lives until process exit, including a rare
+    // cache/protection failure after copying the patch; never free a jump target.
+    guard.published=replace(guard,input_lookup_prefix.size(),input_lookup_prefix.data(),guard.patch.data());
+    return guard.published;
+}
 bool install(void* target,EntryCallback callback,void* redirect,EntryPoint point){
     const auto index=static_cast<unsigned>(point);
     if(index>=slots.size())return false;

@@ -175,6 +175,7 @@ def run_inside(mode: str) -> int:
         cmd = [*network_wrapper(mode), *command(
             r"C:\Program Files (x86)\Steam\Steam.exe", *ui_args, "-silent", "-applaunch", "570940",
             dll_overrides='xinput1_3=n,b' if native_input_trial(mode) else None,
+            graphics_backend='d3dmetal' if mode in M9_MODES else None,
             seh_trace=native_input_trial(mode) and os.environ.get('DSR_MW2_SEH_TRACE')=='validation-v1')]
         cwd = BOTTLE / "drive_c/Games" / folder
     with (BOTTLE / ".dsr-mw2-session.lock").open("a+") as lock:

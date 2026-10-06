@@ -17,6 +17,7 @@ import subprocess
 import sys
 
 from . import action_trial, mpeg_audio_trial, owner_diagnostics, controller_setup, window_controls, steam_controller_focus
+from . import steam_controller_ownership
 from .install_private import WORKSPACE, atomic_write
 from .profile import guard
 from .runtime_paths import bottle_path
@@ -53,7 +54,26 @@ def viewmodel_check():
     target=bottle_path()/'drive_c/Tools/DSR-MW2/viewmodel-v1/m9.dsrvm'
     if target.is_symlink() or target.resolve()!=target or sha(target)!=report['sha256']:
         raise ValueError('Staged viewmodel differs from its checked local build')
+    for source,target_name,digest in additional_assets():
+        target=bottle_path()/'drive_c/Tools/DSR-MW2/viewmodel-v1'/target_name
+        if target.is_symlink() or target.resolve()!=target or sha(target)!=digest:
+            raise ValueError('Staged gun asset differs: '+target_name)
     return report['sha256']
+
+
+def additional_assets():
+    root=WORKSPACE/'converted/mw2-2009/intervention-viewmodel-v1'
+    report=json.loads((root/'manifest.json').read_text())
+    if report['bones']!=90 or report['scope_texture']!=8 or len(report['clips'])!=9:
+        raise ValueError('Unsupported Intervention packet')
+    assets=[(root/'intervention.dsrvm','intervention.dsrvm',report['sha256'])]
+    sound=json.loads((WORKSPACE/'converted/mw2-2009/shot-audio/manifest.json').read_text())
+    if set(sound['files'])!={'m9-shot.wav','intervention-shot.wav'}:raise ValueError('Unexpected gun sound set')
+    assets += [(WORKSPACE/'converted/mw2-2009/shot-audio'/name,name,h) for name,h in sound['files'].items()]
+    for source,name,h in assets:
+        if source.is_symlink() or source.resolve()!=source or sha(source)!=h:
+            raise ValueError('Local gun asset changed: '+name)
+    return assets
 
 
 @contextmanager
@@ -75,6 +95,7 @@ def stage():
     before=verify(bottle);expected();action_trial.manifest()
     controller=controller_setup.configure(bottle)
     steam_focus=steam_controller_focus.configure(bottle)
+    steam_focus['device_ownership']=steam_controller_ownership.configure(bottle)
     diagnostic=owner_diagnostics.stage(WORKSPACE,bottle)
     windows=window_controls.stage(WORKSPACE,bottle)
     source, report=viewmodel_spec()
@@ -90,6 +111,14 @@ def stage():
             if previous.exists() and sha(previous)!=sha(target):raise ValueError('Existing preserved packet differs')
             if not previous.exists():atomic_write(previous,target.read_bytes())
         if not target.exists() or sha(target)!=report['sha256']:atomic_write(target,source.read_bytes())
+        for source,name,h in additional_assets():
+            target=bottle/'drive_c/Tools/DSR-MW2/viewmodel-v1'/name
+            if target.is_symlink() or target.resolve()!=target:raise ValueError('Redirected gun asset destination')
+            if target.exists() and sha(target)!=h:
+                previous=target.with_name('preserved-'+sha(target)+'-'+name)
+                if previous.exists() and sha(previous)!=sha(target):raise ValueError('Preserved gun asset differs')
+                if not previous.exists():atomic_write(previous,target.read_bytes())
+            if not target.exists() or sha(target)!=h:atomic_write(target,source.read_bytes())
         viewmodel_check()
     return {'owner_saves':before,'controller':controller,'steam_focus':steam_focus,'diagnostic':diagnostic,'windows':windows,'viewmodel_sha256':report['sha256']}
 
@@ -158,7 +187,8 @@ def main():
             print('DSR × MW2 — owner test candidate',flush=True)
             print('Create or load your private test character. Your earlier saves stay separate.',flush=True)
             print('M9: hold L2 / right mouse to aim, R2 or R1 / left mouse to fire, Square while aiming / R to reload.',flush=True)
-            print('The first Asylum bonfire has the M9 armory. D-pad Right switches equipped guns.',flush=True)
+            print('Empty trigger starts a reload; release, then press again after the reload to fire.',flush=True)
+            print('Asylum bonfire → MW2 armory → MW2 Intervention (1 soul). Equip in the right hand; D-pad Right switches equipped guns.',flush=True)
             print('Window: Control+Option+1/2/3 for 720p/900p/1080p; Control+Option+M minimizes to free the mouse. Command+Tab also switches away.',flush=True)
             print('New first-person rendering and physical controller response still need your test. This session has a two-hour handling limit.',flush=True)
             print('Quit normally when done; this window restores the private baseline. You control all play.',flush=True)

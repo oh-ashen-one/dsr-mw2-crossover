@@ -11,12 +11,14 @@
 #include <algorithm>
 #include "dsr_snapshot.hpp"
 #include "entry_observer.hpp"
+#include "input_lookup_guard.hpp"
 #include "m9_magazine.hpp"
 #include "m9_action_input.hpp"
 #include "m9_native_aim.hpp"
 #include "m9_recoil_delta.hpp"
 #include "m9_camera_angles.hpp"
 #include "viewmodel_renderer.hpp"
+#include "shot_audio.hpp"
 
 namespace {
 INIT_ONCE once=INIT_ONCE_STATIC_INIT;
@@ -27,12 +29,45 @@ GetStateFn get_state=nullptr;
 HANDLE log_file=INVALID_HANDLE_VALUE;
 unsigned long long calls=0;
 ULONGLONG last_sample=0;
+// Diagnostic only: record the first native-game access violation, then let
+// Windows handle it normally. Never swallow a fault or alter CONTEXT/input.
+HANDLE crash_log=INVALID_HANDLE_VALUE;
+std::uintptr_t crash_base=0;
+volatile LONG crash_recorded=0;
+LONG CALLBACK record_native_crash(EXCEPTION_POINTERS* fault){
+    if(!fault||!fault->ExceptionRecord||!fault->ContextRecord||crash_log==INVALID_HANDLE_VALUE)
+        return EXCEPTION_CONTINUE_SEARCH;
+    const auto& e=*fault->ExceptionRecord;const auto& c=*fault->ContextRecord;
+    if(e.ExceptionCode!=EXCEPTION_ACCESS_VIOLATION||c.Rip<crash_base||c.Rip-crash_base>=0x1d00000||
+       InterlockedCompareExchange(&crash_recorded,1,0)!=0)return EXCEPTION_CONTINUE_SEARCH;
+    char line[512]{};
+    const int n=std::snprintf(line,sizeof(line),
+        "{\"kind\":\"native_access_violation\",\"ms\":%llu,\"rva\":\"%llx\",\"rbx_null\":%s,\"rcx_null\":%s,\"rdx_null\":%s,\"access\":%llu,\"null_target\":%s}\n",
+        GetTickCount64(),static_cast<unsigned long long>(c.Rip-crash_base),
+        c.Rbx==0?"true":"false",c.Rcx==0?"true":"false",c.Rdx==0?"true":"false",
+        static_cast<unsigned long long>(e.NumberParameters?e.ExceptionInformation[0]:0),
+        e.NumberParameters>1&&e.ExceptionInformation[1]==0?"true":"false");
+    DWORD written=0;
+    if(n>0&&n<static_cast<int>(sizeof(line)))WriteFile(crash_log,line,static_cast<DWORD>(n),&written,nullptr);
+    // Code-looking stack words are candidates, NOT an unwound backtrace.
+    // No raw stack bytes, user text, account data or memory dump is saved.
+    for(unsigned i=0;i<64;++i){
+        std::uintptr_t value=0;SIZE_T bytes=0;
+        if(!ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<const void*>(c.Rsp+i*sizeof(value)),&value,sizeof(value),&bytes)||bytes!=sizeof(value))break;
+        if(value<crash_base||value-crash_base>=0x1200000)continue;
+        const int count=std::snprintf(line,sizeof(line),"{\"kind\":\"stack_code_candidate\",\"slot\":%u,\"rva\":\"%llx\"}\n",i,static_cast<unsigned long long>(value-crash_base));
+        if(count>0&&count<static_cast<int>(sizeof(line)))WriteFile(crash_log,line,static_cast<DWORD>(count),&written,nullptr);
+    }
+    FlushFileBuffers(crash_log);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
 bool frame_enabled=false,contracts_enabled=false,post_enabled=false,frame_attempted=false,frame_finished=false;
 std::array<std::int32_t,31> previous_animations{};
 bool gun_enabled=false;
 bool loadout_session=false;
 bool owner_session=false;
 unsigned frame_limit_ms(){return gun_enabled?(owner_session?7200000u:loadout_session?600000u:180000u):post_enabled?90000u:contracts_enabled?60000u:30000u;}
+bool audio_enabled=false;
 bool view_enabled=false,view_installed=false,visibility_installed=false;
 SRWLOCK controller_lock=SRWLOCK_INIT;
 XINPUT_GAMEPAD controller{};ULONGLONG controller_stamp=0;DWORD controller_slot=4;
@@ -55,7 +90,7 @@ DWORD pad_thread=0;
 dsr_mw2::M9Magazine magazine;
 dsr_mw2::M9NativeAim aim;
 dsr_mw2::M9RecoilDelta recoil;
-bool recoil_fault=false;
+bool recoil_fault=false;float scope_fraction=0;
 std::uint32_t recoil_random=0x9e3779b9U;
 std::uint64_t last_loadout=0;
 unsigned long long pad_calls=0,delta_calls=0,set_calls=0;
@@ -234,7 +269,7 @@ void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
         f.loadout=(static_cast<std::uint64_t>(s.right_weapon)<<1)|s.right_slot;
         const bool loadout_changed=last_loadout!=f.loadout;
         const auto previous_loadout=last_loadout;
-        if(loadout_changed){aim.stop(reader,base,s);recoil.reset();last_loadout=f.loadout;}
+        if(loadout_changed){aim.stop(reader,base,s);recoil.reset();scope_fraction=0;last_loadout=f.loadout;}
         const auto action_slot=dsr_mw2::m9_action_slot(animations);
         f.player=s.player;f.total=s.first_bolt.quantity;f.hp=static_cast<int>(s.hp);f.animation=animations[action_slot];
         f.elapsed=elapsed[action_slot];f.now=static_cast<double>(GetTickCount64())/1000.;f.focused=foreground==GetCurrentProcessId();
@@ -287,8 +322,12 @@ void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
                 if(n>0&&n<static_cast<int>(sizeof(line))){DWORD written=0;WriteFile(frame_log,line,static_cast<DWORD>(n),&written,nullptr);}
             }
         }
+        if(s.right_weapon==9200000&&f.focused&&aim.owned&&!aim.fault&&!f.interrupted&&!magazine.reloading&&std::isfinite(dt)&&dt>0&&dt<=.1f)
+            scope_fraction=std::min(1.f,scope_fraction+dt/.4f);
+        else scope_fraction=0;
         if(view_enabled)dsr_mw2::vm_publish({s.player,GetTickCount64(),s.right_weapon,f.animation,magazine.loaded,
-            static_cast<float>(f.elapsed),f.focused&&aim.owned&&!aim.fault&&!magazine.fault&&!f.interrupted});
+            static_cast<float>(f.elapsed),f.focused&&aim.owned&&!aim.fault&&!magazine.fault&&!f.interrupted,
+            magazine.reloading,magazine.empty_reload,static_cast<float>(magazine.reload_elapsed),scope_fraction});
         if(f.focused){
             auto actions=s.actions;
             dsr_mw2::m9_route_actions(actions,request,f.reload||magazine.reloading,aim_enabled);
@@ -344,8 +383,10 @@ int post_delta(dsr_mw2::Address equip,int index,int delta,unsigned char flag,uns
             index==before.first_bolt.index&&before.right_weapon==after.right_weapon&&dsr_mw2::is_m9(before.right_weapon);
         if(gun_enabled&&identity&&caller==base+0x35b149&&delta==-1&&flag==0&&extra==0){
             magazine.consume(before.player,before.first_bolt.quantity,after.first_bolt.quantity,result,static_cast<double>(GetTickCount64())/1000.);
-            if(view_enabled&&!magazine.fault&&result==after.first_bolt.quantity&&before.first_bolt.quantity-after.first_bolt.quantity==1)
-                dsr_mw2::vm_native_shot(magazine.loaded==0);
+            if(!magazine.fault&&result==after.first_bolt.quantity&&before.first_bolt.quantity-after.first_bolt.quantity==1){
+                if(view_enabled)dsr_mw2::vm_native_shot(magazine.loaded==0);
+                if(audio_enabled)dsr_mw2::shot_audio_play(before.right_weapon==9200000);
+            }
             if(camera_enabled&&!recoil_fault&&!magazine.fault&&aim.owned&&aim.player==before.player&&
                pad_thread==GetCurrentThreadId()){
                 // Original deterministic uniform sampler; authentic M9 impulse
@@ -357,11 +398,11 @@ int post_delta(dsr_mw2::Address equip,int index,int delta,unsigned char flag,uns
                 };
                 const float pitch_sample=sample(),yaw_sample=sample();
                 const bool accepted=recoil.shot(before.player,before.first_bolt.quantity,after.first_bolt.quantity,
-                    result,true,pitch_sample,yaw_sample);
+                    result,true,pitch_sample,yaw_sample,before.right_weapon==9200000);
                 char event[384]{};const int length=std::snprintf(event,sizeof(event),
                     "{\"kind\":\"native_recoil_receipt\",\"ms\":%llu,\"accepted\":%s,\"before\":%d,\"after\":%d,\"pitch_velocity\":%.9g,\"yaw_velocity\":%.9g}\n",
                     GetTickCount64(),accepted?"true":"false",before.first_bolt.quantity,after.first_bolt.quantity,
-                    static_cast<double>(25.f+20.f*pitch_sample),static_cast<double>(55.f-110.f*yaw_sample));
+                    static_cast<double>(before.right_weapon==9200000?30.f+55.f*pitch_sample:25.f+20.f*pitch_sample),static_cast<double>(before.right_weapon==9200000?70.f-145.f*yaw_sample:55.f-110.f*yaw_sample));
                 if(length>0&&length<static_cast<int>(sizeof(event))){DWORD written=0;WriteFile(frame_log,event,static_cast<DWORD>(length),&written,nullptr);}
             }
         }
@@ -412,7 +453,11 @@ void scoped_camera(dsr_mw2::Address camera,float dt,dsr_mw2::Address player){
     // The projection path uses cot(vertical_fov/2), divided by aspect for X.
     // Explicit 50-degree vertical diagnostic; MW2's authored65 convention is
     // not yet qualified. Near/far and the native renderer remain untouched.
-    constexpr std::array<float,2> lens{.872664626f,.872664626f};
+    // IW4's 15-degree scope uses a 4:3 horizontal convention. Convert
+    // explicitly to DSR vertical FOV, then interpolate over source ADS-in .4s.
+    const float scope_fov=2.f*std::atan(std::tan(15.f*3.14159265359f/360.f)*.75f);
+    const float fov=s.right_weapon==9200000?.872664626f+(scope_fov-.872664626f)*scope_fraction:.872664626f;
+    const std::array<float,2> lens{fov,fov};
     // Exact native update reads +14c/+150 before adding real input and building
     // the camera basis. Add only the checked *delta* from a genuine shot's kick,
     // preserving native mouse input, limits and collision. No HP/ammo writes.
@@ -532,7 +577,7 @@ void frame_sample(const dsr_mw2::EntryRegisters& registers){
     if(now-frame_start>=frame_limit_ms()){
         if(aim_enabled)aim.stop(reader,base,s);
         if(view_enabled){
-            dsr_mw2::vm_publish({});dsr_mw2::vm_stop();
+            dsr_mw2::vm_publish({});dsr_mw2::vm_stop();dsr_mw2::shot_audio_stop();
             if(visibility_installed){
                 if(status==dsr_mw2::ReadStatus::ok&&s.player){using Function=void(*)(dsr_mw2::Address);original<Function>(dsr_mw2::EntryPoint::player_visibility)(s.player);}
                 dsr_mw2::remove_entry_observer(dsr_mw2::EntryPoint::player_visibility);
@@ -595,6 +640,15 @@ BOOL CALLBACK initialize(PINIT_ONCE,PVOID,PVOID*) {
             GetEnvironmentVariableA("DSR_MW2_SESSION_TRIAL",session_mode,64)==15&&!std::strcmp(session_mode,"loadout-600s-v1");
         owner_session=gun_enabled&&!std::strcmp(loadout_mode,"bonfire-v1")&&
             GetEnvironmentVariableA("DSR_MW2_SESSION_TRIAL",session_mode,64)==16&&!std::strcmp(session_mode,"owner-2h-test-v1");
+        if(owner_session){
+            crash_base=reinterpret_cast<std::uintptr_t>(GetModuleHandleW(nullptr));
+            const bool guarded=dsr_mw2::install_input_lookup_guard(crash_base);
+            const char* message=guarded?"{\"input_lookup_empty_guard\":true}\n":"{\"input_lookup_empty_guard\":false}\n";
+            if(log_file!=INVALID_HANDLE_VALUE){DWORD written=0;WriteFile(log_file,message,static_cast<DWORD>(std::strlen(message)),&written,nullptr);}
+            crash_log=CreateFileW(L"C:\\Tools\\DSR-MW2\\native-crash-v1.jsonl",FILE_APPEND_DATA,FILE_SHARE_READ,
+                                 nullptr,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr);
+            if(crash_log!=INVALID_HANDLE_VALUE)AddVectoredExceptionHandler(0,record_native_crash);
+        }
         char aim_mode[64]{};
         aim_enabled=gun_enabled&&GetEnvironmentVariableA("DSR_MW2_AIM_TRIAL",aim_mode,64)==7&&!std::strcmp(aim_mode,"hold-v1");
         char camera_mode[64]{};
@@ -603,7 +657,10 @@ BOOL CALLBACK initialize(PINIT_ONCE,PVOID,PVOID*) {
         hud_enabled=camera_enabled&&GetEnvironmentVariableA("DSR_MW2_HUD_TRIAL",hud_mode,64)==10&&!std::strcmp(hud_mode,"reticle-v1");
         char view_mode[64]{};
         view_enabled=hud_enabled&&GetEnvironmentVariableA("DSR_MW2_VIEWMODEL_TRIAL",view_mode,64)==12&&
-            !std::strcmp(view_mode,"source-vm-v1")&&dsr_mw2::vm_load(L"C:\\Tools\\DSR-MW2\\viewmodel-v1\\m9.dsrvm");
+            !std::strcmp(view_mode,"source-vm-v1")&&dsr_mw2::vm_load(L"C:\\Tools\\DSR-MW2\\viewmodel-v1\\m9.dsrvm")&&dsr_mw2::vm_load(L"C:\\Tools\\DSR-MW2\\viewmodel-v1\\intervention.dsrvm",true);
+        audio_enabled=view_enabled&&gun_enabled&&
+            dsr_mw2::shot_audio_load(L"C:\\Tools\\DSR-MW2\\viewmodel-v1\\m9-shot.wav",false)&&
+            dsr_mw2::shot_audio_load(L"C:\\Tools\\DSR-MW2\\viewmodel-v1\\intervention-shot.wav",true);
         char frame_mode[64]{};
         if(GetEnvironmentVariableA("DSR_MW2_FRAME_TRIAL",frame_mode,64)==10){
             post_enabled=!std::strcmp(frame_mode,"observe-v3");

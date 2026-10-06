@@ -42,5 +42,18 @@
     "Boss/death/reset/performance acceptance pending",
     "Fresh-machine asset/profile reproduction not performed during publication"
   ],
-  "publication_audit": "Run tools/check_public_release.py and CI against this revision; compiled outputs and private receipts remain ignored."
+  "publication_audit": "Run tools/check_public_release.py and CI against this revision; compiled outputs and private receipts remain ignored.",
+  "current_branch_checkpoint": {
+    "date": "2026-10-06",
+    "branch": "codex/controller-aim-repair",
+    "python_tests_passed": 219,
+    "public_audit_files_checked": 281,
+    "public_audit_failures": 0,
+    "strict_native_adapter_compilation_passed": true,
+    "binaries_executed_during_export": false,
+    "game_launched_during_export": false,
+    "private_history_included": false,
+    "latest_gameplay_acceptance": false,
+    "details": "See HANDOFF.md; earlier release evidence below is historical."
+  }
 }

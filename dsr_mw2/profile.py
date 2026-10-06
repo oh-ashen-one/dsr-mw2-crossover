@@ -85,7 +85,8 @@ def guard(bottle: Path) -> list[str]:
     return reasons
 
 
-def command(executable: str, *args: str, dll_overrides: str | None = None, seh_trace: bool = False) -> list[str]:
+def command(executable: str, *args: str, dll_overrides: str | None = None, seh_trace: bool = False,
+            graphics_backend: str | None = None) -> list[str]:
     # --cx-app / --wl-app enter winewrapper.exe, which crashed in this profile.
     # This installed, trusted Unix Wine entry point passed two fresh console boots.
     overrides = []
@@ -96,7 +97,14 @@ def command(executable: str, *args: str, dll_overrides: str | None = None, seh_t
         # Its supported --dll option sets the child value after that cleanup.
         overrides = ['--dll', dll_overrides]
     debug = ['--debugmsg','-all,+seh'] if seh_trace else []
-    return [str(CX / "bin/wine"), "--bottle", "dsr-mw2", "--no-gui", "--no-update", *overrides, *debug,
+    graphics = []
+    if graphics_backend is not None:
+        if graphics_backend != 'd3dmetal':
+            raise ValueError('Unsupported private graphics backend')
+        # CrossOver's installed wine wrapper applies --env after bottle settings.
+        # This affects only this launch and its children, never global settings.
+        graphics = ['--env', 'CX_GRAPHICS_BACKEND=d3dmetal']
+    return [str(CX / "bin/wine"), "--bottle", "dsr-mw2", "--no-gui", "--no-update", *overrides, *debug, *graphics,
             "--ux-app", str(CX / "lib/wine/x86_64-unix/wine"), executable, *args]
 
 

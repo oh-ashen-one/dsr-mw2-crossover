@@ -26,11 +26,13 @@ ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'tooling-local/native-input'
 RECEIPT=ROOT/'evidence/native-input-build.json'
 SOURCES=['native/src/xinput_observer.cpp','native/xinput_observer.def',
+         'native/include/input_lookup_guard.hpp',
          'native/src/dsr_snapshot.cpp','native/include/dsr_snapshot.hpp',
          'native/src/entry_observer.cpp','native/src/entry_observer.S','native/include/entry_observer.hpp',
          'native/include/m9_magazine.hpp','native/include/m9_action_input.hpp','native/include/m9_native_aim.hpp','native/include/m9_aim_latch.hpp',
          'native/include/m9_recoil_delta.hpp','native/include/m9_camera_angles.hpp',
          'native/include/iw4_view_kick.hpp','native/src/iw4_view_kick.cpp',
+         'native/include/shot_audio.hpp','native/include/pcm_packet.hpp','native/src/shot_audio.cpp',
          'native/include/viewmodel_packet.hpp','native/include/packet_buffer.hpp','native/include/viewmodel_renderer.hpp','native/src/viewmodel_renderer.cpp']
 BACKEND='xinput1_3_backend.dll'
 
@@ -43,7 +45,7 @@ def build():
     binary=OUT/'xinput1_3.dll'
     subprocess.run(['/opt/homebrew/bin/x86_64-w64-mingw32-g++','-std=c++17','-Wall','-Wextra','-Werror','-Wconversion',
         '-O2','-shared','-static','-fno-exceptions','-fno-rtti','-Wl,--no-insert-timestamp','-I',str(ROOT/'native/include'),
-        *[str(ROOT/s) for s in SOURCES if Path(s).suffix in {'.cpp','.S','.def'}],'-ld3dcompiler','-ldxgi','-ld3d11','-luuid','-o',str(binary)],check=True)
+        *[str(ROOT/s) for s in SOURCES if Path(s).suffix in {'.cpp','.S','.def'}],'-lwinmm','-ld3dcompiler','-ldxgi','-ld3d11','-luuid','-o',str(binary)],check=True)
     imports=subprocess.check_output(['/opt/homebrew/bin/x86_64-w64-mingw32-objdump','-p',str(binary)],text=True)
     (OUT/'pe.txt').write_text(imports)
     for forbidden in ('WriteProcessMemory','CreateRemoteThread','DebugActiveProcess','SetThreadContext','SendInput','CreateProcessW'):

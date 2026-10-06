@@ -1,6 +1,6 @@
 import struct
 import unittest
-from dsr_mw2.tae32 import read_events,remove_reload_bolt_effect
+from dsr_mw2.tae32 import read_events,remove_reload_bolt_effect,remove_shared_gunshot
 
 
 def fixture():
@@ -17,6 +17,22 @@ def fixture():
 
 
 class TaeTests(unittest.TestCase):
+    def test_remove_gunshot_leaves_projectile_and_other_sound(self):
+        d=bytearray(fixture());d.extend(bytes(160))
+        struct.pack_into('<I',d,12,len(d))
+        struct.pack_into('<7I',d,168,3,260,0,0,2,196,232)
+        for i,at in enumerate((300,328,352)):struct.pack_into('<III',d,260+12*i,196,200,at)
+        struct.pack_into('<IIii',d,300,128,308,1,10400)
+        struct.pack_into('<IIii',d,328,128,336,9,400)
+        struct.pack_into('<II4i',d,352,2,360,55,30,300,0)
+        result=remove_shared_gunshot(bytes(d));events=read_events(result)[1]
+        self.assertEqual([e.kind for e in events],[128,2])
+        self.assertEqual(events[0].sound,(9,400))
+        self.assertEqual(result[300:],d[300:])
+        with self.assertRaises(ValueError):remove_shared_gunshot(result)
+        struct.pack_into('<I',d,176,1)
+        with self.assertRaises(ValueError):remove_shared_gunshot(bytes(d))
+
     def test_remove_only_held_reload_effect_preserves_shot_and_sound(self):
         d=bytearray(fixture());d.extend(bytes(160))
         struct.pack_into('<I',d,12,len(d));struct.pack_into('<I',d,160,5502)

@@ -92,3 +92,28 @@ def remove_reload_bolt_effect(data: bytes, animations=(5501,5502)) -> bytes:
     if checked[0]!=identity or [key(e) for e in checked[1]]!=wanted:
         raise ValueError('Unrelated TAE events changed')
     return bytes(result)
+
+
+def remove_shared_gunshot(data: bytes) -> bytes:
+    """Remove only a463000's (1,10400) sound; retain native shot/collision events.
+
+    This action now selects original per-weapon audio from its verified native
+    ammo receipt. Other native actions and their sound cues are unchanged.
+    """
+    identity,events=read_events(data);result=bytearray(data)
+    matches=[e for e in events if e.animation==3000 and e.sound==(1,10400)]
+    if len(matches)!=1:raise ValueError('Expected one native gunshot cue')
+    selected=matches[0];count,table=struct.unpack_from('<II',data,0x54)
+    for i in range(count):
+        number,header=struct.unpack_from('<II',data,table+8*i)
+        if number!=3000:continue
+        n,headers,groups=struct.unpack_from('<III',data,header)
+        if groups:raise ValueError('Grouped gunshot events are unsupported')
+        kept=[data[headers+12*j:headers+12*(j+1)] for j in range(n) if j!=selected.index]
+        result[headers:headers+12*(n-1)]=b''.join(kept)
+        struct.pack_into('<I',result,header,n-1)
+    checked=read_events(bytes(result))
+    key=lambda e:(e.animation,e.kind,e.start,e.end,e.parameter_offset,e.sound)
+    if checked[0]!=identity or [key(e) for e in checked[1]]!=[key(e) for e in events if e!=selected]:
+        raise ValueError('Unrelated TAE event changed')
+    return bytes(result)

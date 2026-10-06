@@ -15,13 +15,14 @@ OUT=ROOT/'converted/dsr/action-trial-v1'
 BACKUP=ROOT/'tooling-local/action-backups'
 PATHS=('chr/c0000.esd.dcx','chr/c0000.anibnd.dcx','chr/c0000_a4x.anibnd.dcx','parts/WP_A_1401.partsbnd.dcx','param/GameParam/GameParam.parambnd.dcx')
 ARMORY_PATHS=('parts/WP_A_1406.partsbnd.dcx','script/talk/m18_01_00_00.talkesdbnd.dcx','msg/ENGLISH/menu.msgbnd.dcx','msg/ENGLISH/item.msgbnd.dcx')
+INTERVENTION_PATHS=('parts/WP_A_1407.partsbnd.dcx',)
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 def receipt(b):return b/'.dsr-mw2-action-trial.json'
 def permitted(mode):
     return mode=='m9-test' and os.environ.get('DSR_MW2_NATIVE_INPUT_TRIAL')=='validation-v1' and os.environ.get('DSR_MW2_FRAME_TRIAL')=='observe-v3' and os.environ.get('DSR_MW2_GUN_TRIAL')=='play-v1'
 def manifest():
     r=json.loads((OUT/'manifest.json').read_text())
-    if set(r['files']) not in (set(PATHS),set(PATHS+ARMORY_PATHS)) or set(r['stock'])!=set(r['files']):raise ValueError('Unexpected action asset set')
+    if set(r['files']) not in (set(PATHS),set(PATHS+ARMORY_PATHS),set(PATHS+ARMORY_PATHS+INTERVENTION_PATHS)) or set(r['stock'])!=set(r['files']):raise ValueError('Unexpected action asset set')
     for p,h in r['files'].items():
         f=OUT/p
         if f.is_symlink() or not f.resolve().is_relative_to(OUT) or sha(f)!=h:raise ValueError('Action build changed: '+p)
@@ -33,7 +34,7 @@ def check(mode):
         return ['Gun trial requested without its prepared action assets'] if permitted(mode) else []
     if not permitted(mode):return ['Disposable gun assets installed; normal owner launch is disabled until restoration']
     try:
-        if set(json.loads(r.read_text())['installed'])==set(PATHS+ARMORY_PATHS) and os.environ.get('DSR_MW2_LOADOUT_TRIAL')!='bonfire-v1':
+        if set(ARMORY_PATHS).issubset(json.loads(r.read_text())['installed']) and os.environ.get('DSR_MW2_LOADOUT_TRIAL')!='bonfire-v1':
             return ['Native armory assets require the explicit bonfire-v1 disposable gate']
         expected_override(b/'drive_c/Games/DSR-MW2')
         return []
@@ -52,7 +53,7 @@ def expected_override(candidate):
         if r['before'][p] is not None:
             backup=BACKUP/r['before'][p]
             if sha(backup)!=r['before'][p]:raise ValueError('Action backup changed')
-        elif p!='parts/WP_A_1406.partsbnd.dcx':raise ValueError('Only the new armory model may have no baseline')
+        elif p not in ('parts/WP_A_1406.partsbnd.dcx',*INTERVENTION_PATHS):raise ValueError('Only the new armory model may have no baseline')
     return dict(r['installed'])
 
 def mutate(action):
@@ -73,9 +74,9 @@ def mutate(action):
                 f=candidate/p
                 if f.is_symlink() or not f.resolve().is_relative_to(candidate):raise ValueError('Redirected action target')
                 if not f.exists():
-                    if p!='parts/WP_A_1406.partsbnd.dcx' or m['stock'][p] is not None:raise ValueError('Missing native baseline: '+p)
+                    if p not in ('parts/WP_A_1406.partsbnd.dcx',*INTERVENTION_PATHS) or m['stock'][p] is not None:raise ValueError('Missing native baseline: '+p)
                     before[p]=None;continue
-                if p=='parts/WP_A_1406.partsbnd.dcx':raise ValueError('Preserving existing armory model')
+                if p in ('parts/WP_A_1406.partsbnd.dcx',*INTERVENTION_PATHS):raise ValueError('Preserving existing armory model')
                 h=sha(f);before[p]=h;backup=BACKUP/h
                 if backup.exists() and sha(backup)!=h:raise ValueError('Existing backup differs')
                 if p.startswith('chr/') and h!=m['stock'][p]:raise ValueError('Unmanaged native action data')

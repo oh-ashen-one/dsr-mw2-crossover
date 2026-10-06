@@ -18,15 +18,15 @@ struct VmPacket {
     PacketBuffer<VmTexture> textures;PacketBuffer<VmClip> clips;
     template<class Buffer>bool parse(const Buffer& bytes){
         *this={};
-        if(bytes.size()<32||bytes.size()>32*1024*1024||std::memcmp(bytes.data(),"DSRVM001",8))return false;
+        if(bytes.size()<32||bytes.size()>64*1024*1024||std::memcmp(bytes.data(),"DSRVM001",8))return false;
         std::size_t at=8;
         auto take=[&](void* destination,std::size_t size){
             if(size>bytes.size()-at)return false;
             std::memcpy(destination,bytes.data()+at,size);at+=size;return true;
         };
         std::array<unsigned,6> header{};
-        if(!take(header.data(),sizeof(header))||header[0]!=1||header[1]!=76||!header[2]||header[2]>60000||header[2]%3||
-           !header[3]||header[3]>16||!header[4]||header[4]>8||header[5]!=7)return false;
+        if(!take(header.data(),sizeof(header))||header[0]!=1||(header[1]!=76&&header[1]!=90)||!header[2]||header[2]>60000||header[2]%3||
+           !header[3]||header[3]>20||!header[4]||header[4]>12||header[5]!=(header[1]==90?9u:7u))return false;
         bones=header[1];if(!vertices.resize(header[2])||!draws.resize(header[3])||!textures.resize(header[4])||!clips.resize(header[5]))return false;
         if(!take(vertices.data(),vertices.size()*sizeof(VmVertex))||!take(draws.data(),draws.size()*sizeof(VmDraw)))return false;
         for(const auto& v:vertices){
@@ -60,8 +60,8 @@ struct VmPacket {
         }
         return at==bytes.size();
     }
-    bool pose(unsigned clip,float seconds,float ads,std::array<VmMatrix,76>& out)const{
-        if(bones!=76||clip>=clips.size()||!std::isfinite(seconds)||!std::isfinite(ads)||seconds<0||ads<0||ads>1)return false;
+    template<std::size_t N>bool pose(unsigned clip,float seconds,float ads,std::array<VmMatrix,N>& out)const{
+        if((bones!=76&&bones!=90)||N<bones||clip>=clips.size()||!std::isfinite(seconds)||!std::isfinite(ads)||seconds<0||ads<0||ads>1)return false;
         const auto& c=clips[clip];if(!c.frames||c.poses.size()!=std::size_t(c.frames)*2*bones)return false;
         const float t=std::min(seconds*60.f,static_cast<float>(c.frames-1));
         const auto a=static_cast<unsigned>(t),b=std::min(a+1,c.frames-1);const float f=t-static_cast<float>(a);

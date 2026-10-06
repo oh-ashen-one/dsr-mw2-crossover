@@ -10,8 +10,9 @@ int main(){
     }
     slots[5]=200081;assert(m9_action_slot(slots)==7);
     M9Magazine m;MagazineFrame f;f.player=1;f.hp=100;f.total=85;f.focused=true;m.step(f);m.step(f);
-    f.fire=true;assert(m.step(f)==0);f.fire=false;m.step(f);
-    f.reload=true;f.now=.1;assert(m.step(f)==39);f.reload=false;f.animation=465501;f.elapsed=1.3;m.step(f);assert(m.loaded==0);
+    // Empty trigger starts native reload, with no credit from the request.
+    f.now=.1;f.fire=true;assert(m.step(f)==39);assert(m.loaded==0&&m.reloading);
+    f.fire=false;f.animation=465501;f.elapsed=1.3;m.step(f);assert(m.loaded==0);
     f.elapsed=.02;f.now=.12;m.step(f);
     for(int i=1;i<8;++i){f.elapsed=.02+i*.2;f.now=.12+i*.2;m.step(f);}
     assert(m.loaded==15);f.animation=-1;f.now=2.1;m.step(f);assert(!m.reloading);
@@ -40,4 +41,20 @@ int main(){
     f.hp=100;f.fire=true;assert(m.step(f)==0&&m.loaded==0);
     f.fire=false;m.step(f);f.reload=true;assert(m.step(f)==39);
     m.step({});assert(m.loaded==0&&!m.reloading);
+    // Intervention needs native progress AND its original insert/end times.
+    f={};f.player=1;f.hp=100;f.total=20;f.focused=true;
+    f.loadout=static_cast<std::uint64_t>(9200000)<<1;m.step(f);m.step(f);
+    f.fire=true;f.now=10;assert(m.step(f)==39&&m.empty_reload);
+    f.fire=false;f.animation=465501;f.elapsed=0;m.step(f);
+    for(int i=1;i<=7;++i){f.now=10+i*.2;f.elapsed=i==1?.02:(i-1)*.2;m.step(f);}
+    assert(m.loaded==0&&m.reloading);
+    f.animation=-1;f.now=11.8;m.step(f);assert(m.loaded==5&&m.reloading);
+    f.fire=true;f.now=12;assert(m.step(f)==0);
+    f.fire=false;f.now=13.867;m.step(f);assert(!m.reloading&&m.loaded==5);
+    f.fire=true;assert(m.step(f)==37);m.consume(1,20,19,19,f.now);
+    f.total=19;f.fire=false;m.step(f);f.fire=true;f.now=14.5;assert(m.step(f)==0);
+    f.fire=false;m.step(f);f.fire=true;f.now=14.9;assert(m.step(f)==37);
+    // Focus loss cancels pending credit; a clock alone never completes reload.
+    m.step({});f.fire=false;f.now=20;m.step(f);f.fire=true;assert(m.step(f)==39);
+    f.fire=false;f.now=25;m.step(f);assert(m.loaded==0&&!m.reloading);
 }

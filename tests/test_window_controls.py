@@ -35,7 +35,7 @@ class WindowControlsTests(unittest.TestCase):
         before = CONFIG.replace('\n', '\r\n')
         after = controls.windowed_config(before)
         self.assertIn('Width=1600\r\nHeight=900\r\n', after)
-        self.assertIn('WindowMode=1\r\n', after)
+        self.assertIn('WindowMode=0\r\n', after)
         self.assertEqual(after.split('[DisplaySettingFullScreen]')[1], before.split('[DisplaySettingFullScreen]')[1])
         self.assertEqual(controls.windowed_config(after), after)
         for broken in (CONFIG + '[DisplaySetting]\nWindowMode=1\n', CONFIG.replace('Height=1440\n', '', 1)):
@@ -52,6 +52,18 @@ class WindowControlsTests(unittest.TestCase):
             self.assertFalse(controls.stage(self.root, self.bottle)['configuration_changed'])
             self.assertIn('Width=1920', self.config.read_text())
             execute.assert_not_called()
+
+    def test_borderless_receipt_migrates_once_without_resetting_owner_size(self):
+        before = CONFIG.replace('WindowMode=0', 'WindowMode=1')
+        self.config.write_text(before)
+        (self.bottle / controls.RECEIPT).write_text('{"version":1,"enabled":true}')
+        with patch.object(controls, 'guard', return_value=[]), patch.object(controls, 'bottle_processes', return_value=[]):
+            self.assertTrue(controls.stage(self.root, self.bottle)['configuration_changed'])
+            self.assertEqual(self.config.read_text(), before.replace('WindowMode=1', 'WindowMode=0'))
+            receipt = json.loads((self.bottle / controls.RECEIPT).read_text())
+            self.assertEqual(receipt['version'], 2)
+            self.assertEqual((self.bottle / receipt['mode_fix_backup']).read_text(), before)
+            self.assertFalse(controls.stage(self.root, self.bottle)['configuration_changed'])
 
     def test_active_profile_changed_build_and_redirect_are_refused(self):
         with patch.object(controls, 'guard', return_value=[]), patch.object(controls, 'bottle_processes', return_value=[7]):

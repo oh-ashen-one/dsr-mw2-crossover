@@ -28,10 +28,13 @@ def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def windowed_config(text: str) -> str:
+def windowed_config(text: str, *, preserve_size: bool = False) -> str:
     """Surgical edit of existing display settings; keep keys/audio untouched."""
-    settings = {'DisplaySetting': {'WindowMode': 1},
-                'DisplaySettingWindow': {'Left': 80, 'Top': 80, 'Width': 1600, 'Height': 900}}
+    # DSR: 0=windowed, 1=borderless, 2=fullscreen. Adding WS_THICKFRAME
+    # alone does not select the game's native windowed display mode.
+    settings = {'DisplaySetting': {'WindowMode': 0}}
+    if not preserve_size:
+        settings['DisplaySettingWindow'] = {'Left': 80, 'Top': 80, 'Width': 1600, 'Height': 900}
     for section, values in settings.items():
         pattern = r'(?m)^\[' + re.escape(section) + r'\][^\S\r\n]*\r?\n(?:(?!\[)[^\n]*\n?)*'
         matches = list(re.finditer(pattern, text))
@@ -98,14 +101,28 @@ def stage(workspace: Path, bottle: Path) -> dict:
             if not backup.exists():
                 atomic_write(backup, before)
             atomic_write(config, after)
-            atomic_write(receipt, (json.dumps({'version': 1, 'enabled': True,
+            atomic_write(receipt, (json.dumps({'version': 2, 'enabled': True,
                 'before_sha256': digest(before), 'after_sha256': digest(after),
                 'backup': str(backup.relative_to(bottle)), 'game_launched': False}) + '\n').encode())
             changed = before != after
         else:
             saved = json.loads(receipt.read_text())
-            if saved.get('version') != 1 or saved.get('enabled') is not True:
+            if saved.get('version') not in (1, 2) or saved.get('enabled') is not True:
                 raise ValueError('Window controls receipt needs review')
+            if saved['version'] == 1:
+                config = safe(bottle / CONFIG, bottle)
+                before = config.read_bytes()
+                after = windowed_config(before.decode('utf-8'), preserve_size=True).encode('utf-8')
+                backup = safe(config.with_name('DarkSouls.before-window-mode-fix-' + digest(before) + '.ini'), bottle)
+                if backup.exists() and backup.read_bytes() != before:
+                    raise ValueError('Window mode backup changed')
+                if not backup.exists():atomic_write(backup, before)
+                if config.read_bytes() != before:raise ValueError('Window configuration changed concurrently')
+                atomic_write(config, after)
+                saved.update(version=2, mode_fix_backup=str(backup.relative_to(bottle)),
+                             mode_fix_before_sha256=digest(before), mode_fix_after_sha256=digest(after))
+                atomic_write(receipt, (json.dumps(saved) + '\n').encode())
+                changed = before != after
             # Preserve resolution changes the owner makes on later sessions.
     return {'staged': True, 'configuration_changed': changed, 'sha256': record['sha256'],
             'game_launched': False, 'runtime_verified': False}

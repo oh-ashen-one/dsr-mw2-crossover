@@ -73,6 +73,8 @@ def main(variant='integrated'):
     if framed:
         if variant!='precision-only':
             states[0].conditions=copy.deepcopy(templates[8002].conditions)+states[0].conditions
+            from dsr_mw2.action_priority import prioritize_requests
+            prioritize_requests(states[0].conditions)
         states[9003]=copy.deepcopy(states[69]);states[9003].state_id=9003
         cmd=states[9003].enter_commands[0]
         if cmd.args[1]!=encode(5502)+b'\xa1' or cmd.args[4]!=encode(0)+b'\xa1':raise ValueError('Native ready loop command differs')

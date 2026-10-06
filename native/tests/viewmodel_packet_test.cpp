@@ -10,7 +10,7 @@ int main(int argc,char** argv){
     std::ifstream stream(argv[1],std::ios::binary);
     std::vector<unsigned char> bytes{std::istreambuf_iterator<char>(stream),{}};
     dsr_mw2::VmPacket packet;if(!packet.parse(bytes))return 2;
-    unsigned checks=1;std::array<dsr_mw2::VmMatrix,76> pose{};
+    unsigned checks=1;std::array<dsr_mw2::VmMatrix,90> pose{};
     for(unsigned c=0;c<packet.clips.size();++c){
         const auto& clip=packet.clips[c];
         for(unsigned f=0;f<clip.frames;++f)for(float ads:{0.f,.5f,1.f}){
@@ -19,7 +19,7 @@ int main(int argc,char** argv){
             ++checks;
         }
     }
-    if(packet.pose(7,0,0,pose)||packet.pose(0,-1,0,pose)||packet.pose(0,0,2,pose)||
+    if(packet.pose(static_cast<unsigned>(packet.clips.size()),0,0,pose)||packet.pose(0,-1,0,pose)||packet.pose(0,0,2,pose)||
        packet.pose(0,0,std::numeric_limits<float>::quiet_NaN(),pose))return 5;
     checks+=4;
     // Check truncations at every metadata/vertex field boundary and the tail.

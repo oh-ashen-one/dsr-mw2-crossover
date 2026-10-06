@@ -1,3 +1,13 @@
+# Current branch checkpoint — 2026-10-06
+
+Read [HANDOFF.md](../HANDOFF.md) first. This branch now includes authentic local Intervention asset builders, weapon-specific shot audio, the native empty-input lookup guard, per-launch D3DMetal selection, private Steam controller exclusion and the aim/fire dispatch priority repair. Retail assets are not distributed.
+
+The owner reported only L2 responding and Intervention firing once then stopping. The latest priority repair and controller-connected startup are **not yet accepted as fixing those failures**. Earlier successful shots, source tests and controller detection are bounded evidence. Boss/death/reset/performance acceptance and full MW2 parity remain incomplete.
+
+The older release snapshot below is historical; its M9-only description and earlier unverified renderer statements do not describe all current source changes.
+
+---
+
 # Release status: 0.1.0 source preview
 
 This release preserves the current M9 source build. It is not a claim of a completed full-MW2 conversion or reproducibility on every retail revision. The public export was prepared without launching either game. New users must regenerate all private assets and receipts.

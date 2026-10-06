@@ -78,6 +78,22 @@ int self_test() {
 int main(int argc,char** argv) {
     if(argc!=2)return 64;
     if(!std::strcmp(argv[1],"--self-test"))return self_test();
+    // An explicit window-size request can coexist with the hotkey watcher.
+    // It never focuses the game, injects input, or touches its memory.
+    int preset=-1;
+    if(!std::strcmp(argv[1],"--size-720"))preset=0;
+    if(!std::strcmp(argv[1],"--size-900"))preset=1;
+    if(!std::strcmp(argv[1],"--size-1080"))preset=2;
+    if(preset>=0) {
+        Target target{};EnumWindows(find_window,reinterpret_cast<LPARAM>(&target));
+        if(target.count!=1)return 66;
+        HANDLE process=OpenProcess(SYNCHRONIZE|PROCESS_QUERY_LIMITED_INFORMATION,FALSE,target.pid);
+        if(!process)return 67;
+        const int widths[3]={1280,1600,1920},heights[3]={720,900,1080};
+        const bool ok=owned(target,process)&&private_image(target.pid)&&resizable(target.window)&&
+            resize(target.window,widths[preset],heights[preset]);
+        CloseHandle(process);return ok?0:68;
+    }
     if(std::strcmp(argv[1],"--watch"))return 64;
     HANDLE single=CreateMutexW(nullptr,TRUE,L"Local\\DSRMW2WindowControls");
     if(!single||GetLastError()==ERROR_ALREADY_EXISTS){if(single)CloseHandle(single);return 65;}
@@ -95,6 +111,12 @@ int main(int argc,char** argv) {
     }
     std::printf("{\"event\":\"resizable_style_applied\",\"windows_pid\":%lu,\"gameplay_input\":false}\n",target.pid);
     std::fflush(stdout);
+    // DSR can reuse its selected render resolution for the outer window even
+    // when the INI has a smaller window rectangle. Fit oversized startup
+    // windows once; never keep resizing during owner play.
+    RECT client{};
+    if(GetClientRect(target.window,&client)&&(client.right>1920||client.bottom>1080))
+        resize(target.window,1600,900);
     // One launch-time focus request for this exact owned window. Never poll
     // to steal focus back from the owner's other apps during play.
     const bool focused=SetForegroundWindow(target.window)!=0;

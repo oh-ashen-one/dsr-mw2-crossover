@@ -1,3 +1,5 @@
+> Continuing development: see [HANDOFF.md](HANDOFF.md) for the current controller and Intervention firing failures, latest candidate fixes, and Claude resume instructions.
+
 # DSR × MW2 Crossover
 
 **Modern Warfare 2 (2009) M9 weapons inside native Dark Souls Remastered.**

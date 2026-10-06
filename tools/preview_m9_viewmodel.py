@@ -10,8 +10,8 @@ ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'converted/mw2-2009/viewmodel-v1'
 
 
-def read():
-    data=(OUT/'m9.dsrvm').read_bytes();at=8
+def read(path=None):
+    data=(path or OUT/'m9.dsrvm').read_bytes();at=8
     version,bones,vertices,draws,textures,clips=struct.unpack_from('<6I',data,at);at+=24
     assert data[:8]==b'DSRVM001' and version==1
     dtype=np.dtype([('p','<f4',3),('n','<f4',3),('uv','<f4',2),('j','<u2',4),('w','<f4',4)])
@@ -30,8 +30,8 @@ def read():
     return v,d,t,c
 
 
-def render(name,clip,index,ads,suppressor=False):
-    v,draws,textures,clips=read();m=clips[clip][1][index,ads]
+def render(name,clip,index,ads,suppressor=False,path=None,output=None):
+    v,draws,textures,clips=read(path);m=clips[clip][1][index,ads]
     p=np.column_stack((v['p'],np.ones(len(v))))
     n=np.column_stack((v['n'],np.zeros(len(v))))
     matrices=m[v['j']]
@@ -69,7 +69,7 @@ def render(name,clip,index,ads,suppressor=False):
             region[mask]=distance[mask];image[lo[1]:hi[1]+1,lo[0]:hi[0]+1][mask]=colors[mask];triangles+=1
     im=Image.fromarray(image);label=ImageDraw.Draw(im);label.text((20,20),'OFFLINE MW2 SOURCE ASSET PREVIEW — '+name,fill='white')
     label.line((width//2-5,height//2,width//2+5,height//2),fill=(80,160,180));label.line((width//2,height//2-5,width//2,height//2+5),fill=(80,160,180))
-    im.save(OUT/(name+'.png'));return {'name':name,'drawn_triangles':triangles,'covered_pixels':int(np.isfinite(depth).sum())}
+    im.save((output or OUT)/(name+'.png'));return {'name':name,'drawn_triangles':triangles,'covered_pixels':int(np.isfinite(depth).sum())}
 
 
 if __name__=='__main__':
