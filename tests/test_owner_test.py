@@ -26,6 +26,7 @@ class OwnerTestPackageTests(unittest.TestCase):
         calls=[]
         with patch.object(owner_test,'bottle_path',return_value=Path('/private-fixture')), \
              patch.object(owner_test,'bottle_processes',return_value=[123]), \
+             patch('time.sleep'), \
              patch.object(owner_test,'verify'), \
              patch.object(owner_test.action_trial,'mutate',side_effect=lambda x:calls.append(('actions',x))), \
              patch.object(owner_test.mpeg_audio_trial,'mutate',side_effect=lambda x:calls.append(('audio',x))), \
@@ -51,3 +52,42 @@ class OwnerTestPackageTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError,'agent input is disabled'):
                     validation_session.require_active()
                 guard.assert_not_called();verify.assert_not_called()
+
+
+class RecoverInterruptedTests(unittest.TestCase):
+    def test_closed_window_leftovers_are_restored_and_marker_archived(self):
+        with tempfile.TemporaryDirectory() as root:
+            bottle=Path(root);(bottle/'drive_c/Games/DSR-MW2').mkdir(parents=True)
+            (bottle/'drive_c/Games/DSR-MW2/xinput1_3_backend.dll').write_bytes(b'x')
+            (bottle/owner_test.mpeg_audio_trial.RECEIPT).write_text('{}')
+            (bottle/'.dsr-mw2-action-trial.json').write_text('{}')
+            (bottle/owner_test.MARKER).write_text('{}')
+            calls=[]
+            with patch.object(owner_test,'guard',return_value=[]), \
+                 patch.object(owner_test,'bottle_processes',return_value=[]), \
+                 patch.object(owner_test,'verify',return_value={}), \
+                 patch.object(owner_test,'atomic_write') as archive, \
+                 patch.object(owner_test.action_trial,'mutate',side_effect=lambda x:calls.append(('actions',x))), \
+                 patch.object(owner_test.mpeg_audio_trial,'mutate',side_effect=lambda x:calls.append(('audio',x))), \
+                 patch('tools.native_input_trial.mutate',side_effect=lambda x:calls.append(('native',x))):
+                self.assertEqual(owner_test.recover_interrupted(bottle),['native','audio','actions'])
+            self.assertEqual(calls,[('native','restore'),('audio','restore'),('actions','restore')])
+            archive.assert_called_once()
+            self.assertFalse((bottle/owner_test.MARKER).exists())
+
+    def test_running_session_is_never_touched(self):
+        with tempfile.TemporaryDirectory() as root:
+            bottle=Path(root);(bottle/'.dsr-mw2-action-trial.json').write_text('{}')
+            with patch.object(owner_test,'guard',return_value=[]), \
+                 patch.object(owner_test,'bottle_processes',return_value=[7]), \
+                 patch('time.sleep'), \
+                 patch.object(owner_test.action_trial,'mutate') as actions:
+                with self.assertRaisesRegex(RuntimeError,'still running'):
+                    owner_test.recover_interrupted(bottle)
+            actions.assert_not_called()
+
+    def test_clean_profile_does_nothing(self):
+        with tempfile.TemporaryDirectory() as root:
+            with patch.object(owner_test,'bottle_processes') as processes:
+                self.assertEqual(owner_test.recover_interrupted(Path(root)),[])
+            processes.assert_not_called()

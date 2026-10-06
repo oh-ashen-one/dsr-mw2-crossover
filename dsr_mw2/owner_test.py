@@ -123,6 +123,36 @@ def stage():
     return {'owner_saves':before,'controller':controller,'steam_focus':steam_focus,'diagnostic':diagnostic,'windows':windows,'viewmodel_sha256':report['sha256']}
 
 
+def wait_for_exit(bottle, seconds=60, sleep=None):
+    """Give Wine helpers time to finish exiting after the game closes; never signals them."""
+    import time
+    sleep=sleep or time.sleep
+    for _ in range(seconds):
+        if not bottle_processes(bottle):return True
+        sleep(1)
+    return not bottle_processes(bottle)
+
+
+def recover_interrupted(bottle):
+    """Restore an owner session that was cut off (for example, its window closed) once nothing of it runs."""
+    from tools.native_input_trial import mutate as native_mutate, BACKEND
+    leftovers=[name for name,present in (('native',(bottle/'drive_c/Games/DSR-MW2'/BACKEND).exists()),
+        ('audio',(bottle/mpeg_audio_trial.RECEIPT).exists()),('actions',(bottle/'.dsr-mw2-action-trial.json').exists())) if present]
+    marker=bottle/MARKER
+    if marker.is_symlink():raise ValueError('Redirected owner-test receipt')
+    if not leftovers and not marker.exists():return []
+    if guard(bottle) or not wait_for_exit(bottle):
+        raise RuntimeError('The previous DSR session is still running; quit it before starting another')
+    for item in leftovers:
+        if item=='native':native_mutate('restore')
+        elif item=='audio':mpeg_audio_trial.mutate('restore')
+        else:action_trial.mutate('restore')
+    if marker.exists():
+        atomic_write(WORKSPACE/'tooling-local/launch'/('owner-session-'+sha(marker)+'.json'),marker.read_bytes());marker.unlink()
+    print(json.dumps({'status':'recovered_interrupted_session','restored':leftovers,'owner_saves':verify(bottle)}),flush=True)
+    return leftovers
+
+
 @contextmanager
 def package():
     """Roll back this transaction's installs; never repair an unrelated session."""
@@ -134,7 +164,7 @@ def package():
         native_mutate('install');completed.append('native')
         yield
     finally:
-        if completed and bottle_processes(bottle):
+        if completed and not wait_for_exit(bottle):
             raise RuntimeError('Private processes are still running; preserving the test files and recovery receipts until they close')
         for item in reversed(completed):
             if item=='native':native_mutate('restore')
@@ -149,6 +179,7 @@ def main():
     args=parser.parse_args();bottle=bottle_path()
     with (bottle/'.dsr-mw2-owner-test.lock').open('a+') as owner_lock:
         fcntl.flock(owner_lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        recover_interrupted(bottle)
         marker=bottle/MARKER
         if marker.exists() or marker.is_symlink():raise ValueError('A prior owner-test receipt is present; preserve it for task-local recovery')
         staged=stage()

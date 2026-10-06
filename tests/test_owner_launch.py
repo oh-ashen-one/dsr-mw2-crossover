@@ -1,4 +1,5 @@
 import io
+from pathlib import Path
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -25,3 +26,16 @@ class OwnerLaunchTests(unittest.TestCase):
             self.assertIn("Steam did not start DSR", output.getvalue())
             self.assertNotIn("ordinary diagnostic", output.getvalue())
         self.assertEqual(log.getvalue(), "".join(lines))
+
+
+class WaitForExitTests(unittest.TestCase):
+    def test_restore_waits_for_lingering_wine_helpers(self):
+        from dsr_mw2 import owner_test
+        states = iter([[101], [101], []])
+        with patch.object(owner_test, 'bottle_processes', side_effect=lambda b: next(states)):
+            self.assertTrue(owner_test.wait_for_exit(Path('/x'), seconds=5, sleep=lambda s: None))
+
+    def test_restore_still_refuses_while_processes_remain(self):
+        from dsr_mw2 import owner_test
+        with patch.object(owner_test, 'bottle_processes', return_value=[101]):
+            self.assertFalse(owner_test.wait_for_exit(Path('/x'), seconds=3, sleep=lambda s: None))
