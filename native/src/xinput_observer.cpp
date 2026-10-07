@@ -70,6 +70,9 @@ bool owner_session=false;
 // Owner request: unlimited gun ammunition. A qualified gun shot keeps its native
 // Standard Bolt; magazine/recoil/sound still see an ordinary one-round receipt.
 bool unlimited_ammo=false;
+// Heavy read-only tracing (ESD probe, interaction trace, chr_dump) is opt-in:
+// owner audio went silent after it shipped. DSR_MW2_DIAG_TRACE=esd-v1 enables it.
+bool diagnostics=false;
 unsigned frame_limit_ms(){return gun_enabled?(owner_session?7200000u:loadout_session?600000u:180000u):post_enabled?90000u:contracts_enabled?60000u:30000u;}
 bool audio_enabled=false;
 bool view_enabled=false,view_installed=false,visibility_installed=false;
@@ -656,6 +659,8 @@ BOOL CALLBACK initialize(PINIT_ONCE,PVOID,PVOID*) {
         owner_session=gun_enabled&&!std::strcmp(loadout_mode,"bonfire-v1")&&
             GetEnvironmentVariableA("DSR_MW2_SESSION_TRIAL",session_mode,64)==16&&!std::strcmp(session_mode,"owner-2h-test-v1");
         unlimited_ammo=owner_session;
+        char diag_mode[32]{};
+        diagnostics=owner_session&&GetEnvironmentVariableA("DSR_MW2_DIAG_TRACE",diag_mode,32)==6&&!std::strcmp(diag_mode,"esd-v1");
         if(owner_session){
             crash_base=reinterpret_cast<std::uintptr_t>(GetModuleHandleW(nullptr));
             const bool guarded=dsr_mw2::install_input_lookup_guard(crash_base);
@@ -846,8 +851,7 @@ void sample(DWORD slot,DWORD result,const XINPUT_STATE* state,dsr_mw2::Address c
     if(log_file==INVALID_HANDLE_VALUE || !TryAcquireSRWLockExclusive(&log_lock))return;
     ++calls;
     const auto now=GetTickCount64();
-    esd_tick(now);
-    interact_tick(now,result,state);
+    if(diagnostics){esd_tick(now);interact_tick(now,result,state);}
     if(now-last_sample>=500) {
         last_sample=now;
         LocalReader reader;dsr_mw2::Snapshot s;
