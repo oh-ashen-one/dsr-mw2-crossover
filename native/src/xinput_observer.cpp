@@ -67,6 +67,9 @@ std::array<std::int32_t,31> previous_animations{};
 bool gun_enabled=false;
 bool loadout_session=false;
 bool owner_session=false;
+// Owner request: unlimited gun ammunition. A qualified gun shot keeps its native
+// Standard Bolt; magazine/recoil/sound still see an ordinary one-round receipt.
+bool unlimited_ammo=false;
 unsigned frame_limit_ms(){return gun_enabled?(owner_session?7200000u:loadout_session?600000u:180000u):post_enabled?90000u:contracts_enabled?60000u:30000u;}
 bool audio_enabled=false;
 bool view_enabled=false,view_installed=false,visibility_installed=false;
@@ -272,7 +275,7 @@ void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
         const auto previous_loadout=last_loadout;
         if(loadout_changed){aim.stop(reader,base,s);recoil.reset();scope_fraction=0;last_loadout=f.loadout;}
         const auto action_slot=dsr_mw2::m9_action_slot(animations);
-        f.player=s.player;f.total=s.first_bolt.quantity;f.hp=static_cast<int>(s.hp);f.animation=animations[action_slot];
+        f.player=s.player;f.total=unlimited_ammo&&s.first_bolt.quantity>0?999:s.first_bolt.quantity;f.hp=static_cast<int>(s.hp);f.animation=animations[action_slot];
         f.elapsed=elapsed[action_slot];f.now=static_cast<double>(GetTickCount64())/1000.;f.focused=foreground==GetCurrentProcessId();
         // Read-only position qualification. Reviewed DSR-Gadget's current
         // ChrMapData=player+68 and ChrPosData=control+28; no position writer.
@@ -378,16 +381,24 @@ int post_delta(dsr_mw2::Address equip,int index,int delta,unsigned char flag,uns
     const auto base=reinterpret_cast<dsr_mw2::Address>(GetModuleHandleW(nullptr));
     const auto caller=reinterpret_cast<dsr_mw2::Address>(__builtin_return_address(0));
     const auto first=dsr_mw2::observe(reader,base,before);
-    const int result=original<Function>(dsr_mw2::EntryPoint::item_delta)(equip,index,delta,flag,extra);
-    const auto second=dsr_mw2::observe(reader,base,after);
+    const bool keep=unlimited_ammo&&gun_enabled&&first==dsr_mw2::ReadStatus::ok&&equip==before.equip_data&&
+        index==before.first_bolt.index&&dsr_mw2::is_m9(before.right_weapon)&&caller==base+0x35b149&&
+        delta==-1&&flag==0&&extra==0&&before.first_bolt.quantity>0;
+    const int result=keep?before.first_bolt.quantity:original<Function>(dsr_mw2::EntryPoint::item_delta)(equip,index,delta,flag,extra);
+    const auto second=keep?first:dsr_mw2::observe(reader,base,after);
+    if(keep)after=before;
+    // Receipt seen by the magazine/recoil/sound: the native one, or one virtual round.
+    const int receipt_before=before.first_bolt.quantity;
+    const int receipt_after=keep?receipt_before-1:after.first_bolt.quantity;
+    const int receipt_result=keep?receipt_before-1:result;
     if(!frame_finished&&frame_log!=INVALID_HANDLE_VALUE&&TryAcquireSRWLockExclusive(&frame_lock)){
         ++delta_calls;char line[1024]{};
         const bool identity=first==dsr_mw2::ReadStatus::ok&&second==dsr_mw2::ReadStatus::ok&&
             equip==before.equip_data&&equip==after.equip_data&&before.player==after.player&&
             index==before.first_bolt.index&&before.right_weapon==after.right_weapon&&dsr_mw2::is_m9(before.right_weapon);
         if(gun_enabled&&identity&&caller==base+0x35b149&&delta==-1&&flag==0&&extra==0){
-            magazine.consume(before.player,before.first_bolt.quantity,after.first_bolt.quantity,result,static_cast<double>(GetTickCount64())/1000.);
-            if(!magazine.fault&&result==after.first_bolt.quantity&&before.first_bolt.quantity-after.first_bolt.quantity==1){
+            magazine.consume(before.player,receipt_before,receipt_after,receipt_result,static_cast<double>(GetTickCount64())/1000.);
+            if(!magazine.fault&&receipt_result==receipt_after&&receipt_before-receipt_after==1){
                 if(view_enabled)dsr_mw2::vm_native_shot(magazine.loaded==0);
                 if(audio_enabled)dsr_mw2::shot_audio_play(before.right_weapon==9200000);
             }
@@ -401,8 +412,8 @@ int post_delta(dsr_mw2::Address equip,int index,int delta,unsigned char flag,uns
                     return static_cast<float>(recoil_random>>8)/16777215.f;
                 };
                 const float pitch_sample=sample(),yaw_sample=sample();
-                const bool accepted=recoil.shot(before.player,before.first_bolt.quantity,after.first_bolt.quantity,
-                    result,true,pitch_sample,yaw_sample,before.right_weapon==9200000);
+                const bool accepted=recoil.shot(before.player,receipt_before,receipt_after,
+                    receipt_result,true,pitch_sample,yaw_sample,before.right_weapon==9200000);
                 char event[384]{};const int length=std::snprintf(event,sizeof(event),
                     "{\"kind\":\"native_recoil_receipt\",\"ms\":%llu,\"accepted\":%s,\"before\":%d,\"after\":%d,\"pitch_velocity\":%.9g,\"yaw_velocity\":%.9g}\n",
                     GetTickCount64(),accepted?"true":"false",before.first_bolt.quantity,after.first_bolt.quantity,
@@ -413,9 +424,9 @@ int post_delta(dsr_mw2::Address equip,int index,int delta,unsigned char flag,uns
         const int n=std::snprintf(line,sizeof(line),
             "{\"kind\":\"native_post_ammo\",\"ms\":%llu,\"count\":%llu,\"thread\":%lu,\"identity_matches\":%s,"
             "\"return_rva\":\"%llx\",\"index\":%d,\"delta\":%d,\"flag\":%u,\"extra\":%u,\"native_return\":%d,"
-            "\"before\":%d,\"after\":%d,\"inventory_writes_by_observer\":false}\n",
+            "\"before\":%d,\"after\":%d,\"unlimited_kept\":%s,\"inventory_writes_by_observer\":false}\n",
             GetTickCount64(),delta_calls,GetCurrentThreadId(),identity?"true":"false",static_cast<unsigned long long>(caller-base),
-            index,delta,unsigned(flag),unsigned(extra),result,before.first_bolt.quantity,after.first_bolt.quantity);
+            index,delta,unsigned(flag),unsigned(extra),result,before.first_bolt.quantity,after.first_bolt.quantity,keep?"true":"false");
         if(n>0&&n<static_cast<int>(sizeof(line))){DWORD written=0;WriteFile(frame_log,line,static_cast<DWORD>(n),&written,nullptr);}
         ReleaseSRWLockExclusive(&frame_lock);
     }
@@ -644,6 +655,7 @@ BOOL CALLBACK initialize(PINIT_ONCE,PVOID,PVOID*) {
             GetEnvironmentVariableA("DSR_MW2_SESSION_TRIAL",session_mode,64)==15&&!std::strcmp(session_mode,"loadout-600s-v1");
         owner_session=gun_enabled&&!std::strcmp(loadout_mode,"bonfire-v1")&&
             GetEnvironmentVariableA("DSR_MW2_SESSION_TRIAL",session_mode,64)==16&&!std::strcmp(session_mode,"owner-2h-test-v1");
+        unlimited_ammo=owner_session;
         if(owner_session){
             crash_base=reinterpret_cast<std::uintptr_t>(GetModuleHandleW(nullptr));
             const bool guarded=dsr_mw2::install_input_lookup_guard(crash_base);
