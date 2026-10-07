@@ -13,6 +13,7 @@ Open issues, with evidence:
 - **Controller:** XInput returns 1167 (not connected) for the first ~3 minutes of a session, then connects in game. The owner reports that a DualSense connected over Bluetooth before launch is required.
 - **Ammo:** both guns use native Standard Bolts. The new character had 6 bolts, so the Intervention could not reload or fire at native total 0. Buy bolts at the MW2 armory.
 - **Audio silence:** the Mac's default output device was Mac Studio Speakers (system output: the LG monitor). The game uses the default output at launch.
+- **Zero-HP saves soft-lock (owner, 2026-10-06 night):** after the death bug leaves the character at 0 HP, choosing Continue loads a frozen character that cannot move or quit; only a New Game recovers. Unlimited ammo still needs one Standard Bolt in inventory (armory price 1 soul). Snapshot logging (`chr_dump`) loads fine (console probe) and is shipped; the earlier Steam AppError_46 was not the DLL.
 - **Intervention aims before its first reload:** cosmetic per the owner.
 
 Owner instruction: do not reopen Dark Souls until the owner says so.
