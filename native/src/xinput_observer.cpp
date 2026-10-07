@@ -365,7 +365,9 @@ void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
         f.fire=dsr_mw2::m9_fire_intent(s.actions,f.focused&&(pad.bRightTrigger>=64||(GetAsyncKeyState(VK_LBUTTON)&0x8000)),aim_held);
         const bool scar=dsr_mw2::is_scar(s.right_weapon);
         const bool toggle_down=f.focused&&scar&&((pad.wButtons&XINPUT_GAMEPAD_DPAD_UP)||(GetAsyncKeyState('B')&0x8000));
-        if(toggle_down&&!toggle_was_down&&!magazine.reloading){
+        // MW2 lets the launcher switch interrupt a reload; never refuse the press.
+        if(toggle_down&&!toggle_was_down){
+            if(magazine.reloading)magazine.cancel();
             std::swap(magazine,other_magazine);launcher_mode=!launcher_mode;scar_mode_tick=GetTickCount64();
             char line[160]{};const int n=std::snprintf(line,sizeof(line),"{\"kind\":\"scar_mode\",\"ms\":%llu,\"launcher\":%s}\n",
                 GetTickCount64(),launcher_mode?"true":"false");
@@ -376,7 +378,10 @@ void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
         bullet_scan_step();bullet_apply(f.launcher);
         // Native precision mode suppresses item-use/action14. Read only the
         // owned game's explicit reload key in its already-qualified M9 context.
-        f.reload=f.focused&&((GetAsyncKeyState('R')&0x8000)||(aim_enabled&&aim.owned&&(pad.wButtons&XINPUT_GAMEPAD_X)));
+        const auto& reload_profile=dsr_mw2::gun_profile(s.right_weapon,f.launcher);
+        const bool can_fill=magazine.loaded<std::min(reload_profile.capacity,f.total);
+        f.reload=f.focused&&dsr_mw2::m9_reload_intent(GetAsyncKeyState('R')&0x8000,pad.wButtons&XINPUT_GAMEPAD_X,
+            aim_enabled&&aim.owned,can_fill);
         f.interrupted=s.actions[10]||s.actions[15]||s.actions[16]||s.actions[17]||s.actions[18]||s.actions[42];
         int request=magazine.step(f);
         if(loadout_changed){
@@ -924,6 +929,28 @@ void interact_tick(ULONGLONG now,DWORD result,const XINPUT_STATE* state){
         "{\"kind\":\"interact_trace\",\"ms\":%llu,\"press\":%s,\"pad\":%s,\"snapshot\":%u,\"hp\":%u,\"right\":%d,\"left\":%d,\"style\":%u,\"actions\":[%s],\"esd\":[%s],\"guard_hits\":%llu}\n",
         now,press?"true":"false",pad_down?"true":"false",static_cast<unsigned>(status),s.hp,s.right_weapon,s.left_weapon,s.weapon_style,bits,states,static_cast<unsigned long long>(dsr_mw2::input_lookup_guard_hits())));
 }
+// Death watchdog (owner request): DSR sometimes never starts the death sequence at
+// 0 HP, leaving a frozen character that also poisons the save. If HP stays exactly 0
+// for 2 s, set it to -1 so the player ESD's own `GetHP() < 0` branch runs the normal
+// death, "YOU DIED" and bonfire respawn (up to three nudges, 5 s apart). A real death
+// has already left the HP-testing states, and respawn restores HP either way.
+dsr_mw2::Address death_player=0;ULONGLONG zero_since=0,last_nudge=0;unsigned death_nudges=0;
+void death_watchdog(ULONGLONG now,dsr_mw2::ReadStatus status,const dsr_mw2::Snapshot& s){
+    if(!owner_session||status!=dsr_mw2::ReadStatus::ok)return;
+    if(s.player!=death_player){death_player=s.player;zero_since=0;death_nudges=0;}
+    if(!s.player||!s.max_hp||s.hp){zero_since=0;death_nudges=0;return;}
+    if(!zero_since){zero_since=now;return;}
+    if(now-zero_since<2000||death_nudges>=3||(death_nudges&&now-last_nudge<5000))return;
+    std::int32_t current=-2;SIZE_T got=0;MEMORY_BASIC_INFORMATION m{};
+    const auto field=reinterpret_cast<void*>(s.player+0x3e8);
+    if(!VirtualQuery(field,&m,sizeof(m))||m.State!=MEM_COMMIT||!(m.Protect&PAGE_READWRITE)||
+       !ReadProcessMemory(GetCurrentProcess(),field,&current,sizeof(current),&got)||got!=sizeof(current)||current!=0)return;
+    const std::int32_t dead=-1;std::memcpy(field,&dead,sizeof(dead));
+    ++death_nudges;last_nudge=now;
+    char line[160];
+    esd_write(line,std::snprintf(line,sizeof(line),"{\"kind\":\"death_watchdog\",\"ms\":%llu,\"nudge\":%u,\"zero_ms\":%llu}\n",
+        now,death_nudges,now-zero_since));
+}
 void sample(DWORD slot,DWORD result,const XINPUT_STATE* state,dsr_mw2::Address caller) {
     AcquireSRWLockExclusive(&controller_lock);
     if(result==ERROR_SUCCESS&&state&&(controller_slot==slot||controller_slot>=4||GetTickCount64()-controller_stamp>=250)){
@@ -939,6 +966,7 @@ void sample(DWORD slot,DWORD result,const XINPUT_STATE* state,dsr_mw2::Address c
         LocalReader reader;dsr_mw2::Snapshot s;
         const auto status=dsr_mw2::observe(reader,reinterpret_cast<dsr_mw2::Address>(GetModuleHandleW(nullptr)),s);
         if(status==dsr_mw2::ReadStatus::ok)esd_root=s.player;
+        death_watchdog(now,status,s);
         const auto base=reinterpret_cast<dsr_mw2::Address>(GetModuleHandleW(nullptr));
         DWORD foreground=0;GetWindowThreadProcessId(GetForegroundWindow(),&foreground);
         if(frame_enabled&&!frame_attempted&&status==dsr_mw2::ReadStatus::ok&&s.hp&&dsr_mw2::is_m9(s.right_weapon)&&

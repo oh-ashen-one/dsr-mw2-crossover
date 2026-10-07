@@ -8,6 +8,11 @@ inline bool m9_fire_intent(const std::array<std::uint8_t,53>& actions,bool trigg
     // itself. Counting it as a held trigger hid every R2/R1 press edge.
     return actions[0]||(actions[1]&&!aim_held)||actions[7]||trigger;
 }
+// Square (pad X) reloads whenever the magazine can take rounds, aimed or not; with a
+// full magazine and no aim it stays DSR's native item use (Estus). R always reloads.
+inline bool m9_reload_intent(bool key_r,bool pad_square,bool aiming,bool magazine_can_fill){
+    return key_r||(pad_square&&(aiming||magazine_can_fill));
+}
 inline void m9_route_actions(std::array<std::uint8_t,53>& actions,int request,bool reload,bool aim){
     // R2 is native heavy fire (1), including the two-handed crossbow path.
     // Letting it through fires outside the magazine and poisons the aim state.
