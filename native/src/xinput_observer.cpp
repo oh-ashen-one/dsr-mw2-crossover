@@ -771,6 +771,30 @@ void esd_tick(ULONGLONG now){
 ULONGLONG interact_until=0;bool interact_was_down=false;
 std::array<std::uint8_t,0x35> interact_last{};
 std::uint64_t guard_logged=0;ULONGLONG guard_log_at=0;
+// Read-only snapshots of the player instance, its two model objects and its
+// control block at load, aim start/release, HP reaching zero and each
+// interaction press, so state left changed by aiming can be diffed offline.
+bool dump_was_aiming=false;dsr_mw2::Address dump_player=0;bool dump_hp_zero=false;
+void chr_dump(ULONGLONG now,const char* reason,dsr_mw2::Address player){
+    LocalReader reader;
+    dsr_mw2::Address model=0,model2=0,control=0;
+    reader.get(player,0x60,model);reader.get(player,0x850,model2);reader.get(player,0x68,control);
+    const struct {const char* name;dsr_mw2::Address at;std::size_t size;} regions[]={
+        {"chr",player,0x900},{"model",model,0x100},{"model2",model2,0x100},{"control",control,0x200}};
+    static char line[16384];
+    int at=std::snprintf(line,sizeof(line),"{\"kind\":\"chr_dump\",\"ms\":%llu,\"reason\":\"%s\",\"player\":\"%llx\"",
+        now,reason,static_cast<unsigned long long>(player));
+    for(const auto& r:regions){
+        static std::uint8_t bytes[0x900];std::memset(bytes,0,sizeof(bytes));
+        const bool ok=r.at>=0x10000&&reader.read(r.at,bytes,r.size);
+        at+=std::snprintf(line+at,sizeof(line)-static_cast<std::size_t>(at),",\"%s\":\"",r.name);
+        for(std::size_t i=0;ok&&i<r.size&&at+3<static_cast<int>(sizeof(line))-64;++i)
+            at+=std::snprintf(line+at,sizeof(line)-static_cast<std::size_t>(at),"%02x",bytes[i]);
+        at+=std::snprintf(line+at,sizeof(line)-static_cast<std::size_t>(at),"\"");
+    }
+    at+=std::snprintf(line+at,sizeof(line)-static_cast<std::size_t>(at),"}\n");
+    esd_write(line,at);
+}
 void interact_tick(ULONGLONG now,DWORD result,const XINPUT_STATE* state){
     if(!owner_session||log_file==INVALID_HANDLE_VALUE)return;
     const auto hits=dsr_mw2::input_lookup_guard_hits();
@@ -786,6 +810,18 @@ void interact_tick(ULONGLONG now,DWORD result,const XINPUT_STATE* state){
     const bool down=focused&&(pad_down||(GetAsyncKeyState('E')&0x8000));
     const bool press=down&&!interact_was_down;interact_was_down=down;
     if(press)interact_until=now+1500;
+    if(esd_root&&esd_root!=dump_player){dump_player=esd_root;dump_hp_zero=false;chr_dump(now,"loaded",esd_root);}
+    const bool aiming=aim.owned;
+    if(esd_root&&aiming!=dump_was_aiming)chr_dump(now,aiming?"aim_started":"aim_released",esd_root);
+    dump_was_aiming=aiming;
+    if(esd_root){
+        std::uint32_t live_hp=1;LocalReader hp_reader;
+        if(hp_reader.get(esd_root,0x3e8,live_hp)){
+            if(!live_hp&&!dump_hp_zero){dump_hp_zero=true;chr_dump(now,"hp_zero",esd_root);}
+            else if(live_hp)dump_hp_zero=false;
+        }
+    }
+    if(press&&esd_root)chr_dump(now,"interact_press",esd_root);
     if(now>interact_until)return;
     LocalReader reader;dsr_mw2::Snapshot s;
     const auto status=dsr_mw2::observe(reader,reinterpret_cast<dsr_mw2::Address>(GetModuleHandleW(nullptr)),s);
