@@ -111,3 +111,28 @@ class StockSoundBankTests(unittest.TestCase):
             with owner_test.package():pass
         self.assertNotIn(('audio','install'),calls)
         self.assertEqual(calls,[('actions','install'),('native','install'),('native','restore'),('actions','restore')])
+
+
+class StaleNativeLeftoverTests(unittest.TestCase):
+    def test_older_adapter_build_is_replaced_by_verified_retail(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as out:
+            bottle=Path(root);game=bottle/'drive_c/Games/DSR-MW2';game.mkdir(parents=True)
+            (game/'xinput1_3.dll').write_bytes(b'old adapter');(game/'xinput1_3_backend.dll').write_bytes(b'retail')
+            retail=hashlib.sha256(b'retail').hexdigest()
+            def refuse(action):raise ValueError('Preserving changed native input trial files')
+            with patch('dsr_mw2.native_runtime.RUNTIME_HASHES',{'xinput1_3.dll':retail}), \
+                 patch('tools.native_input_trial.OUT',Path(out)):
+                owner_test.restore_native_leftover(bottle,refuse)
+            self.assertEqual((game/'xinput1_3.dll').read_bytes(),b'retail')
+            self.assertFalse((game/'xinput1_3_backend.dll').exists())
+
+    def test_unverified_backend_is_preserved(self):
+        with tempfile.TemporaryDirectory() as root:
+            bottle=Path(root);game=bottle/'drive_c/Games/DSR-MW2';game.mkdir(parents=True)
+            (game/'xinput1_3.dll').write_bytes(b'old adapter');(game/'xinput1_3_backend.dll').write_bytes(b'unknown')
+            def refuse(action):raise ValueError('Preserving changed native input trial files')
+            with patch('dsr_mw2.native_runtime.RUNTIME_HASHES',{'xinput1_3.dll':'0'*64}):
+                with self.assertRaisesRegex(ValueError,'not the verified retail'):
+                    owner_test.restore_native_leftover(bottle,refuse)
+            self.assertEqual((game/'xinput1_3.dll').read_bytes(),b'old adapter')

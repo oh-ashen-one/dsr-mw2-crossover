@@ -135,6 +135,24 @@ def wait_for_exit(bottle, seconds=60, sleep=None):
     return not bottle_processes(bottle)
 
 
+def restore_native_leftover(bottle,native_mutate):
+    """Restore the retail XInput even when an older adapter build was left installed."""
+    try:
+        native_mutate('restore');return
+    except ValueError as exc:
+        if 'Preserving changed native input trial files' not in str(exc):raise
+    from tools.native_input_trial import OUT
+    from .native_runtime import RUNTIME_HASHES
+    root=bottle/'drive_c/Games/DSR-MW2';target=root/'xinput1_3.dll';backend=root/'xinput1_3_backend.dll'
+    retail=RUNTIME_HASHES['xinput1_3.dll']
+    if backend.is_symlink() or target.is_symlink() or sha(backend)!=retail:
+        raise ValueError('Native input backend is not the verified retail DLL; preserving files')
+    atomic_write(target,backend.read_bytes())
+    saved=OUT/'retail-backend-preserved.dll'
+    if saved.exists() and sha(saved)!=retail:raise ValueError('Existing backend archive differs')
+    atomic_write(saved,backend.read_bytes());backend.unlink()
+
+
 def recover_interrupted(bottle):
     """Restore an owner session that was cut off (for example, its window closed) once nothing of it runs."""
     from tools.native_input_trial import mutate as native_mutate, BACKEND
@@ -147,7 +165,7 @@ def recover_interrupted(bottle):
     if guard(bottle) or not wait_for_exit(bottle):
         raise RuntimeError('The previous DSR session is still running; quit it before starting another')
     for item in leftovers:
-        if item=='native':native_mutate('restore')
+        if item=='native':restore_native_leftover(bottle,native_mutate)
         elif item=='audio':mpeg_audio_trial.mutate('restore')
         else:action_trial.mutate('restore')
     if marker.exists():
