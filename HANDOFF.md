@@ -11,6 +11,7 @@ Agent keyboard/mouse in the disposable validation bank (owner-authorized), throu
 - **M203:** the live Bullet 600 row was located (exactly one match). The toggle logged `scar_mode launcher` and `m203_bullet grenade`. The launcher magazine reloaded to 1 and the grenade fired (`m203_shot`, bolt kept). A fiery impact burst is visible on the arch pillar.
 - **Interaction survives aiming:** after Intervention aim + five shots, SCAR-H full auto and M203 shots, the bonfire prompt and menu still work. Unequip (F in the equipment menu) also works. With the heavy diagnostics off, the "A disappears after aiming" failure did not reproduce.
 - **Audio is produced:** a ScreenCaptureKit capture of only the DSR process measured mean -22.4 dB and peak -2.6 dB (bonfire ambience plus grenade shot). File: `evidence/raw/20261007/audio-check-*.mp4`.
+- **First-person SCAR-H ADS renders:** model, gloved hand and top rail all draw. The camera sits slightly high, looking along the rail instead of through the sights, so the SCAR-H needs its own scoped-camera eye offset (the M9/Intervention have tuned values). Screenshot: `evidence/raw/20261007/scar-first-person-ads.png`.
 - **Bolt-slot confusion explained:** the character owns 140 Standard Bolts equipped in a bolt slot. The native total reads the equipped slot, so an unequipped bolt stack means no shots.
 - **Fixes from the test:**
   - The keyboard M203 toggle moved from G (DSR's gesture menu) to B.
