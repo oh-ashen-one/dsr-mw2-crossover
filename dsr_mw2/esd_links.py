@@ -8,8 +8,10 @@ machine 1's same-numbered action states: no hit reactions, no fall damage, and a
 player frozen at 0 HP instead of dying. Talk ESDs share IDs across machines too.
 
 `install()` replaces to_writer with a copy that links (and shares identical
-conditions) only within each machine. `cross_machine_links(data)` reads raw ESD
-bytes and lists every condition whose next-state pointer leaves its own machine.
+conditions) only within each machine. The writer body is adapted from Soulstruct
+2.6.0 (Scott Mooney / Grimrukh and contributors, GPL-3.0-or-later; see NOTICE).
+`cross_machine_links(data)` reads raw ESD bytes and lists every condition whose
+next-state pointer leaves its own machine.
 """
 import copy
 

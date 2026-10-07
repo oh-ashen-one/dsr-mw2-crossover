@@ -1,3 +1,20 @@
+# Current branch checkpoint — 2026-10-07 (v0.2.0)
+
+Read [HANDOFF.md](../HANDOFF.md) first. Since 0.1.0 this source adds the authentic Intervention and SCAR-H + M203 builders, per-weapon handling profiles, the native grenade projectile swap, controller/aim/fire dispatch repairs, hip reload, unlimited test ammo, launcher recovery, and the per-machine ESD writer that restores DSR's native hit reactions, fall damage and death.
+
+| Gate | Evidence / remaining work |
+| --- | --- |
+| Controller, aim, fire, reload | Owner-tested with a PS5 controller through CrossOver. |
+| Intervention | Owner-tested; timed MW2 bolt/reload cadence. |
+| SCAR-H + M203 | Agent play-tested in a disposable save, then owner-tested; aim-camera height needs tuning. |
+| Audio | Owner-confirmed per-weapon shot audio. |
+| Hit reactions / falls / death and respawn | Root cause fixed offline (4574 cross-machine ESD links → 0); owner runtime confirmation pending. |
+| Grenades, full roster, other platforms | Not started / unqualified. |
+
+The older checkpoints below are historical.
+
+---
+
 # Current branch checkpoint — 2026-10-06
 
 Read [HANDOFF.md](../HANDOFF.md) first. This branch now includes authentic local Intervention asset builders, weapon-specific shot audio, the native empty-input lookup guard, per-launch D3DMetal selection, private Steam controller exclusion and the aim/fire dispatch priority repair. Retail assets are not distributed.

@@ -15,7 +15,7 @@ These are fetched separately into local tool environments, not redistributed as 
 
 | Dependency | Pinned revision / version | Credit and license |
 | --- | --- | --- |
-| [Soulstruct](https://github.com/Grimrukh/soulstruct) | `12b69189a2ccebbc623a1b6565be89a18d6c9958` (2.6.0) | Scott Mooney / Grimrukh and contributors; GPL-3.0-or-later. FLVER, binders, params, TPF, ESD and other DSR formats. |
+| [Soulstruct](https://github.com/Grimrukh/soulstruct) | `12b69189a2ccebbc623a1b6565be89a18d6c9958` (2.6.0) | Scott Mooney / Grimrukh and contributors; GPL-3.0-or-later. FLVER, binders, params, TPF, ESD and other DSR formats. `dsr_mw2/esd_links.py` adapts Soulstruct's `ESD.to_writer` so condition links stay within each state machine (fixes cross-machine links when machines share state IDs). |
 | [Soulstruct-Havok](https://github.com/Grimrukh/soulstruct-havok) | `bf2d41fc83de4a43bd3ed3df8605741f143cad2c` (1.5.0) | Scott Mooney / Grimrukh and contributors; GPL-3.0-or-later. Havok parsing and original Python spline conversion path. |
 | [SciPy](https://scipy.org/) | 1.18.0 | SciPy developers; BSD-3-Clause and bundled notices. |
 | [NumPy](https://numpy.org/) | See requirements file | NumPy developers; BSD-3-Clause. |
@@ -30,6 +30,7 @@ OpenAssetTools' own dependencies retain their upstream licenses. The project doe
 
 These projects informed investigation or architecture. They are **not bundled adapters** and their availability is not proof that this crossover works. No implementation from the following references is copied into this release:
 
+- [JKAnderson/DSR-Gadget](https://github.com/JKAnderson/DSR-Gadget): player structure layout (ChrMapData / ChrPosData) reviewed for read-only position qualification; no code copied.
 - [Grimrukh/Firelink](https://github.com/Grimrukh/Firelink), revision `54c00cdbfe875af4f4270f013f714f45e2e9a284`: native interface research.
 - [metal-crow/Dark-Souls-1-Overhaul](https://github.com/metal-crow/Dark-Souls-1-Overhaul), revision `2a3d8cbe2acee663bef03c7be4f968dbb68f951f`: interface behavior reference; AGPL code was not copied.
 - [lud-berthe/Dark-Souls-Remastered-Gyro-aim-mod](https://github.com/lud-berthe/Dark-Souls-Remastered-Gyro-aim-mod), revision `d451f3f6403fa4ee24b9fc0868280893fd2e17df`: camera/visibility investigation, independently checked against the supported image.

@@ -15,6 +15,11 @@ by Laupetin and contributors, licensed under GPL version 3. The full upstream
 license is preserved in tools/OAT-LICENSE-GPL-3.0.txt. The native64 patch
 includes the macOS patch; do not apply both.
 
+dsr_mw2/esd_links.py adapts the ESD writer (ESD.to_writer) from Soulstruct
+2.6.0 by Scott Mooney (Grimrukh) and contributors, licensed under GPL version 3
+or later, used here under GPL version 3. The change keeps condition links and
+condition sharing within each state machine.
+
 External dependencies and research references have their own licenses; see
 CREDITS.md. Their complete implementations are not vendored here.
 
