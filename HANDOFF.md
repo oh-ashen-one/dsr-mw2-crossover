@@ -2,6 +2,21 @@
 
 Updated 2026-10-06. Branch: `codex/controller-aim-repair`. **Work in progress; controller and repeated Intervention firing are not accepted as fixed.**
 
+## Claude update — 2026-10-06 night (owner sessions after the gun fixes)
+
+Owner-confirmed working: R2/R1 fire while L2-aimed (native action 1 is held by the aim itself and is now excluded from fire intent), M9 and suppressed M9 shooting, Intervention aim/fire, L1 quick-fire routing (gun requests dispatched from native crossbow states 65/67/68), shot audio no longer distorted (3 voices at -6 dB, stock sound bank).
+
+Open issues, with evidence:
+- **Interaction (A/E: bonfire, doors, ladders) and unequipping die after the first L2 aim.** In two sessions everything worked before the first aim (bonfire purchase, unequipping the sword) and nothing worked after it, including with the sword equipped. Ruled out: the input-lookup guard (its new hit counter stayed 0), ActionButtonParam (GameParam diff: only EquipParamWeapon/Bullet/CharaInitParam/ShopLineupParam differ), the aim byte at player+0x2a6 (returns to 128), HUD masking (restored every frame), and the ESD idle state (the player is in m1 s0 when presses fail; ladder requests 43/47 are never raised). Next suspects: the third-person body hide in `view_visibility` (it ORs 0x200 into model dirty fields and never clears them itself), and the scoped camera redirect.
+- **A diagnostic build broke the launch.** Adding `chr_dump` (read-only hex snapshots of player/model/control at load, aim release and each press) to `xinput_observer.cpp` made private Steam fail process creation: `LaunchApp failed with AppError_46 (0x2DB)`. That source was not committed; the shipped adapter is back to `2e103a99`. Find why before reintroducing it.
+- **Leftover trial files.** When the launcher is killed or Steam fails, trial files can remain. `owner_test.recover_interrupted` restores them on the next start, but it refuses when the installed DLL differs from the current build. That case needed a manual retail-XInput restore (backend hash 756cad… verified first).
+- **Controller:** XInput returns 1167 (not connected) for the first ~3 minutes of a session, then connects in game. The owner reports that a DualSense connected over Bluetooth before launch is required.
+- **Ammo:** both guns use native Standard Bolts. The new character had 6 bolts, so the Intervention could not reload or fire at native total 0. Buy bolts at the MW2 armory.
+- **Audio silence:** the Mac's default output device was Mac Studio Speakers (system output: the LG monitor). The game uses the default output at launch.
+- **Intervention aims before its first reload:** cosmetic per the owner.
+
+Owner instruction: do not reopen Dark Souls until the owner says so.
+
 ## Claude update — 2026-10-06 evening
 
 Owner session evidence (native logs, sliced at the last two `input_lookup_empty_guard` markers):
