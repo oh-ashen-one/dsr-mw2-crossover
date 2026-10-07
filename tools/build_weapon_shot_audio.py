@@ -1,4 +1,4 @@
-"""Prepare two original MW2 PCM shot sounds; no audio device/game is opened."""
+"""Prepare the original MW2 PCM shot sounds (M9, Intervention, SCAR-H, M203); no audio device/game is opened."""
 import hashlib,json
 from pathlib import Path
 from dsr_mw2.wav_container import repair_oat_pcm
@@ -7,6 +7,8 @@ def main():
     sources={
         'm9-shot.wav':'converted/mw2-2009/m9/audio/weap_beretta_slst_3c.wav',
         'intervention-shot.wav':'converted/mw2-2009/unlinked/intervention/sound/weapons/cheytac/weap_cheytac_slst_2d3.wav',
+        'scar-shot.wav':'converted/mw2-2009/unlinked/scar/sound/weapons/scar/weap_scar_slst_06b4.wav',
+        'm203-shot.wav':'converted/mw2-2009/unlinked/scar/sound/weapons/m203/weap_m203_sl_1b.wav',
     }
     out=ROOT/'converted/mw2-2009/shot-audio';out.mkdir(exist_ok=True)
     sha=lambda d:hashlib.sha256(d).hexdigest()

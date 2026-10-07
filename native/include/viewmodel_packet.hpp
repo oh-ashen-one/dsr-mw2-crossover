@@ -26,7 +26,8 @@ struct VmPacket {
         };
         std::array<unsigned,6> header{};
         if(!take(header.data(),sizeof(header))||header[0]!=1||(header[1]!=76&&header[1]!=90)||!header[2]||header[2]>60000||header[2]%3||
-           !header[3]||header[3]>20||!header[4]||header[4]>12||header[5]!=(header[1]==90?9u:7u))return false;
+           !header[3]||header[3]>20||!header[4]||header[4]>12||
+           (header[1]==90?header[5]!=9u:(header[5]!=7u&&header[5]!=14u)))return false; // 14: SCAR-H rifle+M203
         bones=header[1];if(!vertices.resize(header[2])||!draws.resize(header[3])||!textures.resize(header[4])||!clips.resize(header[5]))return false;
         if(!take(vertices.data(),vertices.size()*sizeof(VmVertex))||!take(draws.data(),draws.size()*sizeof(VmDraw)))return false;
         for(const auto& v:vertices){

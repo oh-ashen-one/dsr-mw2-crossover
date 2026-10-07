@@ -99,7 +99,7 @@ DWORD pad_thread=0;
 dsr_mw2::M9Magazine magazine;
 // SCAR-H: rifle and M203 keep separate magazines; D-pad Up / G swaps which one
 // `magazine` is, so a toggle never empties or refills the other mode.
-dsr_mw2::M9Magazine other_magazine;bool launcher_mode=false,toggle_was_down=false;
+dsr_mw2::M9Magazine other_magazine;bool launcher_mode=false,toggle_was_down=false;std::uint64_t scar_mode_tick=0;
 dsr_mw2::M9NativeAim aim;
 dsr_mw2::M9RecoilDelta recoil;
 bool recoil_fault=false;float scope_fraction=0;
@@ -365,7 +365,7 @@ void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
         const bool scar=dsr_mw2::is_scar(s.right_weapon);
         const bool toggle_down=f.focused&&scar&&((pad.wButtons&XINPUT_GAMEPAD_DPAD_UP)||(GetAsyncKeyState('G')&0x8000));
         if(toggle_down&&!toggle_was_down&&!magazine.reloading){
-            std::swap(magazine,other_magazine);launcher_mode=!launcher_mode;
+            std::swap(magazine,other_magazine);launcher_mode=!launcher_mode;scar_mode_tick=GetTickCount64();
             char line[160]{};const int n=std::snprintf(line,sizeof(line),"{\"kind\":\"scar_mode\",\"ms\":%llu,\"launcher\":%s}\n",
                 GetTickCount64(),launcher_mode?"true":"false");
             if(n>0&&n<static_cast<int>(sizeof(line))){DWORD written=0;WriteFile(frame_log,line,static_cast<DWORD>(n),&written,nullptr);}
@@ -404,12 +404,14 @@ void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
                 if(n>0&&n<static_cast<int>(sizeof(line))){DWORD written=0;WriteFile(frame_log,line,static_cast<DWORD>(n),&written,nullptr);}
             }
         }
-        if(s.right_weapon==9200000&&f.focused&&aim.owned&&!aim.fault&&!f.interrupted&&!magazine.reloading&&std::isfinite(dt)&&dt>0&&dt<=.1f)
-            scope_fraction=std::min(1.f,scope_fraction+dt/.4f);
+        // ADS-in: Intervention .4 s; SCAR-H .25 s rifle / .5 s M203 (adsTransInTime).
+        const float ads_in=s.right_weapon==9200000?.4f:dsr_mw2::is_scar(s.right_weapon)?(f.launcher?.5f:.25f):0.f;
+        if(ads_in>0&&f.focused&&aim.owned&&!aim.fault&&!f.interrupted&&!magazine.reloading&&std::isfinite(dt)&&dt>0&&dt<=.1f)
+            scope_fraction=std::min(1.f,scope_fraction+dt/ads_in);
         else scope_fraction=0;
         if(view_enabled)dsr_mw2::vm_publish({s.player,GetTickCount64(),s.right_weapon,f.animation,magazine.loaded,
             static_cast<float>(f.elapsed),f.focused&&aim.owned&&!aim.fault&&!magazine.fault&&!f.interrupted,
-            magazine.reloading,magazine.empty_reload,static_cast<float>(magazine.reload_elapsed),scope_fraction});
+            magazine.reloading,magazine.empty_reload,static_cast<float>(magazine.reload_elapsed),scope_fraction,f.launcher,scar_mode_tick});
         if(f.focused){
             auto actions=s.actions;
             dsr_mw2::m9_route_actions(actions,request,f.reload||magazine.reloading,aim_enabled);
@@ -475,7 +477,7 @@ int post_delta(dsr_mw2::Address equip,int index,int delta,unsigned char flag,uns
             magazine.consume(before.player,receipt_before,receipt_after,receipt_result,static_cast<double>(GetTickCount64())/1000.);
             if(!magazine.fault&&receipt_result==receipt_after&&receipt_before-receipt_after==1){
                 if(view_enabled)dsr_mw2::vm_native_shot(magazine.loaded==0);
-                if(audio_enabled)dsr_mw2::shot_audio_play(before.right_weapon==9200000);
+                if(audio_enabled)dsr_mw2::shot_audio_play(static_cast<unsigned>(dsr_mw2::gun_profile(before.right_weapon,launcher_mode&&dsr_mw2::is_scar(before.right_weapon)).kind));
             }
             if(camera_enabled&&!recoil_fault&&!magazine.fault&&aim.owned&&aim.player==before.player&&
                pad_thread==GetCurrentThreadId()){
@@ -546,7 +548,11 @@ void scoped_camera(dsr_mw2::Address camera,float dt,dsr_mw2::Address player){
     // IW4's 15-degree scope uses a 4:3 horizontal convention. Convert
     // explicitly to DSR vertical FOV, then interpolate over source ADS-in .4s.
     const float scope_fov=2.f*std::atan(std::tan(15.f*3.14159265359f/360.f)*.75f);
-    const float fov=s.right_weapon==9200000?.872664626f+(scope_fov-.872664626f)*scope_fraction:.872664626f;
+    // SCAR-H rifle adsZoomFov 50 (IW4 4:3 horizontal) converted to DSR vertical;
+    // the M203's 80 is wider than native, so launcher ADS keeps the native FOV.
+    const float scar_fov=2.f*std::atan(std::tan(50.f*3.14159265359f/360.f)*.75f);
+    const float target=s.right_weapon==9200000?scope_fov:dsr_mw2::is_scar(s.right_weapon)&&!launcher_mode?scar_fov:.872664626f;
+    const float fov=.872664626f+(target-.872664626f)*scope_fraction;
     const std::array<float,2> lens{fov,fov};
     // Exact native update reads +14c/+150 before adding real input and building
     // the camera basis. Add only the checked *delta* from a genuine shot's kick,
@@ -750,10 +756,13 @@ BOOL CALLBACK initialize(PINIT_ONCE,PVOID,PVOID*) {
         hud_enabled=camera_enabled&&GetEnvironmentVariableA("DSR_MW2_HUD_TRIAL",hud_mode,64)==10&&!std::strcmp(hud_mode,"reticle-v1");
         char view_mode[64]{};
         view_enabled=hud_enabled&&GetEnvironmentVariableA("DSR_MW2_VIEWMODEL_TRIAL",view_mode,64)==12&&
-            !std::strcmp(view_mode,"source-vm-v1")&&dsr_mw2::vm_load(L"C:\\Tools\\DSR-MW2\\viewmodel-v1\\m9.dsrvm")&&dsr_mw2::vm_load(L"C:\\Tools\\DSR-MW2\\viewmodel-v1\\intervention.dsrvm",true);
+            !std::strcmp(view_mode,"source-vm-v1")&&dsr_mw2::vm_load(L"C:\\Tools\\DSR-MW2\\viewmodel-v1\\m9.dsrvm",0)&&dsr_mw2::vm_load(L"C:\\Tools\\DSR-MW2\\viewmodel-v1\\intervention.dsrvm",1);
+        if(view_enabled)dsr_mw2::vm_load(L"C:\\Tools\\DSR-MW2\\viewmodel-v1\\scar.dsrvm",2); // optional third slot
         audio_enabled=view_enabled&&gun_enabled&&
-            dsr_mw2::shot_audio_load(L"C:\\Tools\\DSR-MW2\\viewmodel-v1\\m9-shot.wav",false)&&
-            dsr_mw2::shot_audio_load(L"C:\\Tools\\DSR-MW2\\viewmodel-v1\\intervention-shot.wav",true);
+            dsr_mw2::shot_audio_load(L"C:\\Tools\\DSR-MW2\\viewmodel-v1\\m9-shot.wav",0)&&
+            dsr_mw2::shot_audio_load(L"C:\\Tools\\DSR-MW2\\viewmodel-v1\\intervention-shot.wav",1);
+        // SCAR-H and M203 shots are optional until their WAVs are staged.
+        if(audio_enabled){dsr_mw2::shot_audio_load(L"C:\\Tools\\DSR-MW2\\viewmodel-v1\\scar-shot.wav",2);dsr_mw2::shot_audio_load(L"C:\\Tools\\DSR-MW2\\viewmodel-v1\\m203-shot.wav",3);}
         char frame_mode[64]{};
         if(GetEnvironmentVariableA("DSR_MW2_FRAME_TRIAL",frame_mode,64)==10){
             post_enabled=!std::strcmp(frame_mode,"observe-v3");

@@ -69,8 +69,12 @@ def additional_assets():
     if report['bones']!=90 or report['scope_texture']!=8 or len(report['clips'])!=9:
         raise ValueError('Unsupported Intervention packet')
     assets=[(root/'intervention.dsrvm','intervention.dsrvm',report['sha256'])]
+    scar=WORKSPACE/'converted/mw2-2009/scar-viewmodel-v1'
+    scar_report=json.loads((scar/'manifest.json').read_text())
+    if scar_report['bones']!=76 or len(scar_report['clips'])!=14:raise ValueError('Unsupported SCAR-H packet')
+    assets.append((scar/'scar.dsrvm','scar.dsrvm',scar_report['sha256']))
     sound=json.loads((WORKSPACE/'converted/mw2-2009/shot-audio/manifest.json').read_text())
-    if set(sound['files'])!={'m9-shot.wav','intervention-shot.wav'}:raise ValueError('Unexpected gun sound set')
+    if set(sound['files'])!={'m9-shot.wav','intervention-shot.wav','scar-shot.wav','m203-shot.wav'}:raise ValueError('Unexpected gun sound set')
     assets += [(WORKSPACE/'converted/mw2-2009/shot-audio'/name,name,h) for name,h in sound['files'].items()]
     for source,name,h in assets:
         if source.is_symlink() or source.resolve()!=source or sha(source)!=h:

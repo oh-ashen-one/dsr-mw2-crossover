@@ -16,13 +16,15 @@ BACKUP=ROOT/'tooling-local/action-backups'
 PATHS=('chr/c0000.esd.dcx','chr/c0000.anibnd.dcx','chr/c0000_a4x.anibnd.dcx','parts/WP_A_1401.partsbnd.dcx','param/GameParam/GameParam.parambnd.dcx')
 ARMORY_PATHS=('parts/WP_A_1406.partsbnd.dcx','script/talk/m18_01_00_00.talkesdbnd.dcx','msg/ENGLISH/menu.msgbnd.dcx','msg/ENGLISH/item.msgbnd.dcx')
 INTERVENTION_PATHS=('parts/WP_A_1407.partsbnd.dcx',)
+SCAR_PATHS=('parts/WP_A_1408.partsbnd.dcx',)
+NEW_MODELS=('parts/WP_A_1406.partsbnd.dcx',*INTERVENTION_PATHS,*SCAR_PATHS)
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 def receipt(b):return b/'.dsr-mw2-action-trial.json'
 def permitted(mode):
     return mode=='m9-test' and os.environ.get('DSR_MW2_NATIVE_INPUT_TRIAL')=='validation-v1' and os.environ.get('DSR_MW2_FRAME_TRIAL')=='observe-v3' and os.environ.get('DSR_MW2_GUN_TRIAL')=='play-v1'
 def manifest():
     r=json.loads((OUT/'manifest.json').read_text())
-    if set(r['files']) not in (set(PATHS),set(PATHS+ARMORY_PATHS),set(PATHS+ARMORY_PATHS+INTERVENTION_PATHS)) or set(r['stock'])!=set(r['files']):raise ValueError('Unexpected action asset set')
+    if set(r['files']) not in (set(PATHS),set(PATHS+ARMORY_PATHS),set(PATHS+ARMORY_PATHS+INTERVENTION_PATHS),set(PATHS+ARMORY_PATHS+INTERVENTION_PATHS+SCAR_PATHS)) or set(r['stock'])!=set(r['files']):raise ValueError('Unexpected action asset set')
     for p,h in r['files'].items():
         f=OUT/p
         if f.is_symlink() or not f.resolve().is_relative_to(OUT) or sha(f)!=h:raise ValueError('Action build changed: '+p)
@@ -53,7 +55,7 @@ def expected_override(candidate):
         if r['before'][p] is not None:
             backup=BACKUP/r['before'][p]
             if sha(backup)!=r['before'][p]:raise ValueError('Action backup changed')
-        elif p not in ('parts/WP_A_1406.partsbnd.dcx',*INTERVENTION_PATHS):raise ValueError('Only the new armory model may have no baseline')
+        elif p not in NEW_MODELS:raise ValueError('Only the new armory model may have no baseline')
     return dict(r['installed'])
 
 def mutate(action):
@@ -74,9 +76,9 @@ def mutate(action):
                 f=candidate/p
                 if f.is_symlink() or not f.resolve().is_relative_to(candidate):raise ValueError('Redirected action target')
                 if not f.exists():
-                    if p not in ('parts/WP_A_1406.partsbnd.dcx',*INTERVENTION_PATHS) or m['stock'][p] is not None:raise ValueError('Missing native baseline: '+p)
+                    if p not in NEW_MODELS or m['stock'][p] is not None:raise ValueError('Missing native baseline: '+p)
                     before[p]=None;continue
-                if p in ('parts/WP_A_1406.partsbnd.dcx',*INTERVENTION_PATHS):raise ValueError('Preserving existing armory model')
+                if p in NEW_MODELS:raise ValueError('Preserving existing armory model')
                 h=sha(f);before[p]=h;backup=BACKUP/h
                 if backup.exists() and sha(backup)!=h:raise ValueError('Existing backup differs')
                 if p.startswith('chr/') and h!=m['stock'][p]:raise ValueError('Unmanaged native action data')

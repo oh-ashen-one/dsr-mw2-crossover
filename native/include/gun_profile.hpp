@@ -21,11 +21,13 @@ struct GunProfile {
 constexpr std::int32_t scar_weapon = 9300000;
 
 // M9 values are the qualified native-verified reload; Intervention values are the
-// authored MW2 timings. SCAR-H values are provisional until its weapon file is read.
+// authored MW2 timings. SCAR-H values come from scar_mp / gl_scar_mp: fireTime .093,
+// clip 20, reload 2.833 with the clip-in note at frame 48; M203 fireTime .3, clip 1,
+// reload 2.6 with reloadAddTime 1.16.
 inline constexpr GunProfile m9_profile{GunKind::m9, 15, .08, false, false, 0, 0, 0};
 inline constexpr GunProfile intervention_profile{GunKind::intervention, 5, .916, false, true, 1.8, 2.268, 3.867};
-inline constexpr GunProfile scar_profile{GunKind::scar, 20, .1, true, true, 1.6, 2.4, 3.0};
-inline constexpr GunProfile scar_launcher_profile{GunKind::scar_launcher, 1, .5, false, true, 1.8, 2.6, 2.6};
+inline constexpr GunProfile scar_profile{GunKind::scar, 20, .093, true, true, 1.6, 2.833, 2.833};
+inline constexpr GunProfile scar_launcher_profile{GunKind::scar_launcher, 1, .3, false, true, 1.16, 2.6, 2.6};
 
 inline bool is_scar(std::int32_t weapon) { return weapon == scar_weapon; }
 

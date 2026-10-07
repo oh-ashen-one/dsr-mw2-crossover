@@ -10,8 +10,8 @@
 namespace {
 using namespace dsr_mw2;
 SRWLOCK state_lock=SRWLOCK_INIT,render_lock=SRWLOCK_INIT;
-VmState state{};VmPacket packets[2];VmPacket* packet=nullptr;
-std::uint64_t shot=0;bool last=false,loaded[2]{},stopped=false;
+VmState state{};VmPacket packets[3];VmPacket* packet=nullptr;
+std::uint64_t shot=0;bool last=false,loaded[3]{},stopped=false;
 volatile LONG64 healthy=0,rendered_player=0;
 template<class T>void release(T*& v){if(v)v->Release();v=nullptr;}
 ID3D11Device* device=nullptr;ID3D11DeviceContext* immediate=nullptr;ID3D11DeviceContext* deferred=nullptr;
@@ -118,17 +118,20 @@ bool initialize(IDXGISwapChain* chain){
     b.RenderTarget[0].DestBlend=D3D11_BLEND_INV_SRC_ALPHA;b.RenderTarget[0].BlendOp=D3D11_BLEND_OP_ADD;
     b.RenderTarget[0].SrcBlendAlpha=D3D11_BLEND_ONE;b.RenderTarget[0].DestBlendAlpha=D3D11_BLEND_INV_SRC_ALPHA;b.RenderTarget[0].BlendOpAlpha=D3D11_BLEND_OP_ADD;
     if(FAILED(device->CreateBlendState(&b,&scope_blend)))return false;
-    event("device_initialized",packet==&packets[1]?2:1);return true;
+    event("device_initialized",static_cast<long>(packet-packets)+1);return true;
 }
 }
 namespace dsr_mw2 {
-bool vm_load(const wchar_t* file,bool sniper){
-    const unsigned index=sniper?1u:0u;if(loaded[index])return true;
+bool vm_load(const wchar_t* file,unsigned slot){
+    if(slot>=3)return false;
+    const unsigned index=slot;if(loaded[index])return true;
+    static constexpr unsigned expected_bones[3]={76,90,76},expected_clips[3]={7,9,14};
     HANDLE input=CreateFileW(file,GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
     if(input==INVALID_HANDLE_VALUE)return false;
     LARGE_INTEGER size{};bool okay=GetFileSizeEx(input,&size)&&size.QuadPart>0&&size.QuadPart<=64*1024*1024;
     PacketBuffer<unsigned char> bytes;if(okay){okay=bytes.resize(static_cast<std::size_t>(size.QuadPart));DWORD n=0;if(okay)okay=ReadFile(input,bytes.data(),static_cast<DWORD>(bytes.size()),&n,nullptr)&&n==bytes.size();}
-    CloseHandle(input);loaded[index]=okay&&packets[index].parse(bytes)&&packets[index].bones==(sniper?90u:76u);event("packet_loaded",loaded[index]?(sniper?2:1):0);return loaded[index];
+    CloseHandle(input);loaded[index]=okay&&packets[index].parse(bytes)&&packets[index].bones==expected_bones[index]&&packets[index].clips.size()==expected_clips[index];
+    event("packet_loaded",loaded[index]?static_cast<long>(index)+1:0);return loaded[index];
 }
 void vm_publish(const VmState& s){AcquireSRWLockExclusive(&state_lock);if(s.player!=state.player||s.weapon!=state.weapon)shot=0;state=s;ReleaseSRWLockExclusive(&state_lock);}
 void vm_native_shot(bool last_round){AcquireSRWLockExclusive(&state_lock);shot=GetTickCount64();last=last_round;ReleaseSRWLockExclusive(&state_lock);}
@@ -141,8 +144,8 @@ void vm_render(void* swap_chain){
     const auto now=GetTickCount64();DWORD foreground=0;GetWindowThreadProcessId(GetForegroundWindow(),&foreground);
     if(stopped||!s.visible||!s.player||!s.stamp||now-s.stamp>150||foreground!=GetCurrentProcessId()){
         InterlockedExchange64(&healthy,0);ReleaseSRWLockExclusive(&render_lock);return;}
-    const bool sniper=s.weapon==9200000;auto* chosen=&packets[sniper?1:0];
-    if(!loaded[sniper?1:0]){InterlockedExchange64(&healthy,0);ReleaseSRWLockExclusive(&render_lock);return;}
+    const bool sniper=s.weapon==9200000,scar=s.weapon==9300000;const unsigned slot=sniper?1u:scar?2u:0u;auto* chosen=&packets[slot];
+    if(!loaded[slot]){InterlockedExchange64(&healthy,0);ReleaseSRWLockExclusive(&render_lock);return;}
     if(packet!=chosen){destroy();packet=chosen;}
     auto* chain=static_cast<IDXGISwapChain*>(swap_chain);
     ID3D11Texture2D* back=nullptr;ID3D11RenderTargetView* target=nullptr;
@@ -159,8 +162,17 @@ void vm_render(void* swap_chain){
         }
         if(SUCCEEDED(h)&&description.Width&&description.Height){
             struct Constants {std::array<VmMatrix,90> bones;float projection[4];} c{};
-            unsigned clip=0;float seconds=0,ads=sniper?std::clamp(s.ads,0.f,1.f):1.f;
-            if(sniper&&s.reloading){clip=s.empty_reload?4u:3u;seconds=std::max(0.f,s.reload_elapsed);ads=0;}
+            unsigned clip=0;float seconds=0,ads=(sniper||scar)?std::clamp(s.ads,0.f,1.f):1.f;
+            if(scar){
+                // SCAR-H packet slots (dsr_mw2/scar_assets.py CLIPS): 0 idle, 1 fire, 3 reload,
+                // 4 empty reload, 8 M203 idle, 9 M203 fire, 10 M203 reload, 11/12 mode switches.
+                const ULONGLONG since=s.mode_changed&&now>=s.mode_changed?now-s.mode_changed:~0ull;
+                if(s.reloading){clip=s.launcher?10u:(s.empty_reload?4u:3u);seconds=std::max(0.f,s.reload_elapsed);ads=0;}
+                else if(since<800){clip=s.launcher?11u:12u;seconds=static_cast<float>(since)/1000.f;ads=0;}
+                else if(fired&&now>=fired&&now-fired<(s.launcher?333u:167u)){clip=s.launcher?9u:1u;seconds=static_cast<float>(now-fired)/1000.f;}
+                else clip=s.launcher?8u:0u;
+            }
+            else if(sniper&&s.reloading){clip=s.empty_reload?4u:3u;seconds=std::max(0.f,s.reload_elapsed);ads=0;}
             else if(s.animation==465501||s.animation==465502){clip=s.animation==465501?4u:3u;seconds=std::max(0.f,s.elapsed);ads=0;}
             else if(sniper&&fired&&now>=fired&&now-fired<916){clip=now-fired<50?1u:7u;seconds=static_cast<float>(now-fired)/1000.f-(clip==7?.05f:0.f);}
             else if(!sniper&&fired&&now>=fired&&now-fired<(empty?234u:467u)){clip=empty?2u:1u;seconds=static_cast<float>(now-fired)/1000.f;}

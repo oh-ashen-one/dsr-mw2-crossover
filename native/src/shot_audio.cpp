@@ -13,7 +13,7 @@
 namespace {
 struct Sound {dsr_mw2::PacketBuffer<unsigned char> data;dsr_mw2::PcmInfo info;bool ready=false;};
 struct Voice {HWAVEOUT output=nullptr;WAVEHDR header{};};
-Sound sounds[2];std::array<Voice,8> voices{};
+Sound sounds[4];std::array<Voice,8> voices{};
 // Rapid fire stacked up to eight full-scale 1-3 s gunshots and clipped the
 // whole mix. Keep three overlapping shots (newest replaces oldest) at -6 dB.
 constexpr std::size_t max_voices=3;std::array<ULONGLONG,8> started{};
@@ -34,8 +34,9 @@ bool close(Voice& v){
 }
 }
 namespace dsr_mw2 {
-bool shot_audio_load(const wchar_t* file,bool sniper){
-    auto& s=sounds[sniper?1:0];if(s.ready)return true;
+bool shot_audio_load(const wchar_t* file,unsigned slot){
+    if(slot>=4)return false;
+    auto& s=sounds[slot];if(s.ready)return true;
     HANDLE f=CreateFileW(file,GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
     if(f==INVALID_HANDLE_VALUE)return false;
     LARGE_INTEGER n{};bool okay=GetFileSizeEx(f,&n)&&n.QuadPart>=44&&n.QuadPart<=8*1024*1024;
@@ -46,10 +47,11 @@ bool shot_audio_load(const wchar_t* file,bool sniper){
         std::int16_t sample;std::memcpy(&sample,s.data.data()+44+i,2);
         sample=static_cast<std::int16_t>(sample/2);std::memcpy(s.data.data()+44+i,&sample,2);
     }
-    record("loaded",s.ready?(sniper?2u:1u):0u);return s.ready;
+    record("loaded",s.ready?slot+1u:0u);return s.ready;
 }
-void shot_audio_play(bool sniper){
-    AcquireSRWLockExclusive(&audio_lock);auto& s=sounds[sniper?1:0];
+void shot_audio_play(unsigned slot){
+    if(slot>=4)return;
+    AcquireSRWLockExclusive(&audio_lock);auto& s=sounds[slot];
     if(s.ready){
         std::size_t index=max_voices;
         for(std::size_t i=0;i<max_voices;++i)if(close(voices[i])){index=i;break;}
@@ -71,7 +73,8 @@ void shot_audio_play(bool sniper){
             }
             if(code!=MMSYSERR_NOERROR&&v.output){waveOutReset(v.output);close(v);}
             started[index]=GetTickCount64();
-            record(code==MMSYSERR_NOERROR?(sniper?"intervention_shot":"m9_shot"):"output_failed",code);
+            static const char* const names[]={"m9_shot","intervention_shot","scar_shot","m203_shot"};
+            record(code==MMSYSERR_NOERROR?names[slot]:"output_failed",code);
         }
     }
     ReleaseSRWLockExclusive(&audio_lock);
