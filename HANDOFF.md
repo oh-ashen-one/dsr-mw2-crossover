@@ -2,6 +2,29 @@
 
 Updated 2026-10-06. Branch: `codex/controller-aim-repair`. **Work in progress; controller and repeated Intervention firing are not accepted as fixed.**
 
+## Best owner run so far — 2026-10-06 late night
+
+Owner result: new character, controller working, door/bonfire interaction, M9 and Intervention aiming and shooting, boss killed, boss weapon and key collected.
+
+Why this run worked. Each item is evidence-backed in the native logs and commits on this branch:
+1. **R2/R1 fire while L2-aimed.** DSR holds native action 1 (with 19/21/52) for the aim itself. Fire intent now ignores action 1 from the first L2 travel (`m9_fire_intent(..., aim_held)`, LT ≥ 8 or RMB). Previously no fire edge existed until aim dropped, and a light L2 pull fired a shot.
+2. **L1 quick-fire.** The native crossbow aim/shot/recovery states (65/67/68) now lead with idle's exact gun dispatch (`tools/repair_crossbow_requests.py`, builders preserve it). The magazine treats 465520 and 464000 as ready.
+3. **Request priority.** Idle checks fire/reload/empty-reload before the persistent aim hold.
+4. **Shot audio no longer clips.** Three overlapping voices at -6 dB, and the stock sound bank (the MPEG bank swap doubled every shot).
+5. **Unlimited ammo (owner request).** A qualified gun shot keeps its native Standard Bolt; the magazine, recoil and sound get a normal one-round receipt, and the magazine fills to capacity while any bolt is held. Armory bolts cost 1 soul, because a character needs at least one bolt for native shots to spawn.
+6. **Launch hygiene.**
+   - The controller must be connected over Bluetooth before launch.
+   - No other CrossOver game or Unreal editor may be busy, because the GPU gate blocks DSR (ARK, ARK DevKit).
+   - Closing the launcher tab no longer strands trial files: `owner_test.recover_interrupted` restores them and resets the live bank to `m9`.
+   - Never press Continue on a character the death bug left at 0 HP; start a New Game.
+
+Still open:
+- **No game audio.** The Mac default output (Mac Studio Speakers) plays Spotify fine, the shot waveOut calls succeed, all 858 sound files are byte-identical to stock, the bottle has winecoreaudio with no audio DLL overrides, and the sandbox only denies network. A Wine-side output test is next.
+- **Interaction prompts vanish** after the player two-hands/dual-wields and uses a weapon (owner observation: boss item pickup prompt disappeared). Same family as the earlier "A stops after first aim" failures; `chr_dump` snapshots at load/aim/HP zero/press are shipped for the diff.
+- **Death not triggering at 0 HP** (seen twice, both after aiming).
+
+Next owner request: MW2 SCAR-H with grenade launcher, then grenades.
+
 ## Claude update — 2026-10-06 night (owner sessions after the gun fixes)
 
 Owner-confirmed working: R2/R1 fire while L2-aimed (native action 1 is held by the aim itself and is now excluded from fire intent), M9 and suppressed M9 shooting, Intervention aim/fire, L1 quick-fire routing (gun requests dispatched from native crossbow states 65/67/68), shot audio no longer distorted (3 voices at -6 dB, stock sound bank).
