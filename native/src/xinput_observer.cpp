@@ -75,6 +75,7 @@ bool unlimited_ammo=false;
 // Heavy read-only tracing (ESD probe, interaction trace, chr_dump) is opt-in:
 // owner audio went silent after it shipped. DSR_MW2_DIAG_TRACE=esd-v1 enables it.
 bool diagnostics=false;
+bool diag_lift=false,lift_was_down=false;  // validation-only fall probe (DSR_MW2_DIAG_LIFT=lift-v1)
 unsigned frame_limit_ms(){return gun_enabled?(owner_session?7200000u:loadout_session?600000u:180000u):post_enabled?90000u:contracts_enabled?60000u:30000u;}
 bool audio_enabled=false;
 bool view_enabled=false,view_installed=false,visibility_installed=false;
@@ -324,6 +325,21 @@ void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
     const auto status=dsr_mw2::observe(reader,base,s);++pad_calls;pad_thread=GetCurrentThreadId();
     dsr_mw2::Address actual_control=0,mediator=0;
     reader.get(s.player,0x68,actual_control);reader.get(actual_control,0x20,mediator);
+    if(diag_lift&&status==dsr_mw2::ReadStatus::ok){
+        DWORD fg=0;GetWindowThreadProcessId(GetForegroundWindow(),&fg);
+        const bool down=fg==GetCurrentProcessId()&&(GetAsyncKeyState('K')&0x8000);
+        dsr_mw2::Address position=0;
+        if(down&&!lift_was_down&&reader.get(actual_control,0x28,position)&&position>0x10000){
+            MEMORY_BASIC_INFORMATION mbi{};
+            if(VirtualQuery(reinterpret_cast<void*>(position+0x10),&mbi,sizeof(mbi))&&mbi.State==MEM_COMMIT&&(mbi.Protect&(PAGE_READWRITE|PAGE_EXECUTE_READWRITE))){
+                auto* y=reinterpret_cast<float*>(position+0x14);const float before=*y;
+                if(std::isfinite(before)){*y=before+30.f;
+                    char line[160]{};const int n=std::snprintf(line,sizeof(line),"{\"kind\":\"diag_lift\",\"ms\":%llu,\"y\":%.3f,\"hp\":%d}\n",GetTickCount64(),static_cast<double>(before),static_cast<int>(s.hp));
+                    if(n>0&&n<static_cast<int>(sizeof(line))){DWORD written=0;WriteFile(frame_log,line,static_cast<DWORD>(n),&written,nullptr);}}
+            }
+        }
+        lift_was_down=down;
+    }
     std::array<std::int32_t,31> animations{};std::array<float,31> elapsed{};
     bool animation_read=mediator!=0;
     for(unsigned i=0;i<31;++i){
@@ -745,6 +761,8 @@ BOOL CALLBACK initialize(PINIT_ONCE,PVOID,PVOID*) {
         unlimited_ammo=owner_session;
         char diag_mode[32]{};
         diagnostics=owner_session&&GetEnvironmentVariableA("DSR_MW2_DIAG_TRACE",diag_mode,32)==6&&!std::strcmp(diag_mode,"esd-v1");
+        char lift_mode[32]{};
+        diag_lift=owner_session&&GetEnvironmentVariableA("DSR_MW2_DIAG_LIFT",lift_mode,32)==7&&!std::strcmp(lift_mode,"lift-v1");
         if(owner_session){
             crash_base=reinterpret_cast<std::uintptr_t>(GetModuleHandleW(nullptr));
             const bool guarded=dsr_mw2::install_input_lookup_guard(crash_base);

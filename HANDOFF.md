@@ -2,6 +2,13 @@
 
 Updated 2026-10-06. Branch: `codex/controller-aim-repair`. **Work in progress; controller and repeated Intervention firing are not accepted as fixed.**
 
+## Death / hit-reaction root cause — 2026-10-07 afternoon
+
+- Symptom: no hit staggers, no fall damage (rolled off the map and stayed under it), and at 0 HP the player froze instead of dying/respawning. Logged animations over hours of play contained zero hit (2000s), fall (7060s), landing (1500s) or death (6000s) clips.
+- Cause: Soulstruct 2.6.0 `ESD.to_writer` keeps one state-id -> offset table for the whole file. Player `c0000.esd` machines 0 (master: damage, falls, death) and 1 (actions) share IDs 0-224, so every re-written machine-0 condition pointed at machine 1's same-numbered state. The first damage/death transition left the master machine forever. Shipped ESD: 4574 cross-machine links; stock: 0. Decompiled ESP looks identical because the reader resolves pointers back to IDs — only a raw link check shows it.
+- Fix: `dsr_mw2/esd_links.py` (per-machine writer, installed by `soulstruct_tools.configure()` for every tool; `cross_machine_links()` raw checker) and `tools/repair_esd_machine_links.py` (re-wrote the packaged c0000 with identical states/conditions/commands, 0 cross links). Talk ESDs t181000/t181001 checked: 0 cross links.
+- The 2 s HP-0 watchdog stays as a fallback. Owner runtime test of hits/death pending.
+
 ## Claude agent play-test — 2026-10-07 (SCAR-H build, heavy diagnostics off)
 
 Agent keyboard/mouse in the disposable validation bank (owner-authorized), through `tools/owned_dsr_input.py`. Results are from native logs and screenshots:

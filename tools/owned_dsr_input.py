@@ -6,7 +6,7 @@ from dsr_mw2.launch import game_processes
 from tools.inspect_dsr_window import windows
 from dsr_mw2.validation_session import require_active
 
-KEYS={'w':13,'a':0,'s':1,'d':2,'e':14,'q':12,'r':15,'f':3,'g':5,'b':11,'x':7,'enter':36,'escape':53,
+KEYS={'w':13,'a':0,'s':1,'d':2,'e':14,'q':12,'r':15,'f':3,'g':5,'b':11,'x':7,'k':40,'enter':36,'escape':53,
       'space':49,'tab':48,'left':123,'right':124,'down':125,'up':126,'shift':56,'ctrl':59}
 
 

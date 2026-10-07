@@ -31,4 +31,7 @@ def configure():
         raise ValueError("Soulstruct is using an unexpected AppData directory")
     Config.CONSOLE_LOG_LEVEL = "ERROR"
     Config.setup_log()
+    # Soulstruct 2.6.0 links ESD conditions across machines that share state IDs.
+    from .esd_links import install
+    install()
     return Config
