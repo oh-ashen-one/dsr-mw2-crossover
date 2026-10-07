@@ -8,10 +8,15 @@
 #include "packet_buffer.hpp"
 #include <array>
 #include <cstdio>
+#include <cstdint>
+#include <cstring>
 namespace {
 struct Sound {dsr_mw2::PacketBuffer<unsigned char> data;dsr_mw2::PcmInfo info;bool ready=false;};
 struct Voice {HWAVEOUT output=nullptr;WAVEHDR header{};};
 Sound sounds[2];std::array<Voice,8> voices{};
+// Rapid fire stacked up to eight full-scale 1-3 s gunshots and clipped the
+// whole mix. Keep three overlapping shots (newest replaces oldest) at -6 dB.
+constexpr std::size_t max_voices=3;std::array<ULONGLONG,8> started{};
 SRWLOCK audio_lock=SRWLOCK_INIT;
 HANDLE log_file=INVALID_HANDLE_VALUE;
 void record(const char* kind,unsigned code){
@@ -37,23 +42,37 @@ bool shot_audio_load(const wchar_t* file,bool sniper){
     if(okay){okay=s.data.resize(static_cast<std::size_t>(n.QuadPart));DWORD got=0;
         if(okay)okay=ReadFile(f,s.data.data(),static_cast<DWORD>(s.data.size()),&got,nullptr)&&got==s.data.size();}
     CloseHandle(f);s.ready=okay&&pcm_info(s.data.data(),s.data.size(),s.info);
+    if(s.ready)for(std::uint32_t i=0;i+1<s.info.bytes;i+=2){
+        std::int16_t sample;std::memcpy(&sample,s.data.data()+44+i,2);
+        sample=static_cast<std::int16_t>(sample/2);std::memcpy(s.data.data()+44+i,&sample,2);
+    }
     record("loaded",s.ready?(sniper?2u:1u):0u);return s.ready;
 }
 void shot_audio_play(bool sniper){
     AcquireSRWLockExclusive(&audio_lock);auto& s=sounds[sniper?1:0];
-    if(s.ready)for(auto& v:voices){
-        if(!close(v))continue;
-        WAVEFORMATEX format{};format.wFormatTag=WAVE_FORMAT_PCM;format.nChannels=s.info.channels;
-        format.nSamplesPerSec=44100;format.wBitsPerSample=16;format.nBlockAlign=static_cast<WORD>(s.info.channels*2);
-        format.nAvgBytesPerSec=format.nSamplesPerSec*format.nBlockAlign;
-        auto code=waveOutOpen(&v.output,WAVE_MAPPER,&format,0,0,CALLBACK_NULL);
-        if(code==MMSYSERR_NOERROR){
-            v.header.lpData=reinterpret_cast<char*>(s.data.data()+44);v.header.dwBufferLength=s.info.bytes;
-            code=waveOutPrepareHeader(v.output,&v.header,sizeof(v.header));
-            if(code==MMSYSERR_NOERROR)code=waveOutWrite(v.output,&v.header,sizeof(v.header));
+    if(s.ready){
+        std::size_t index=max_voices;
+        for(std::size_t i=0;i<max_voices;++i)if(close(voices[i])){index=i;break;}
+        if(index==max_voices){
+            index=0;for(std::size_t i=1;i<max_voices;++i)if(started[i]<started[index])index=i;
+            waveOutReset(voices[index].output);
+            if(!close(voices[index]))index=max_voices;
         }
-        if(code!=MMSYSERR_NOERROR&&v.output){waveOutReset(v.output);close(v);}
-        record(code==MMSYSERR_NOERROR?(sniper?"intervention_shot":"m9_shot"):"output_failed",code);break;
+        if(index<max_voices){
+            auto& v=voices[index];
+            WAVEFORMATEX format{};format.wFormatTag=WAVE_FORMAT_PCM;format.nChannels=s.info.channels;
+            format.nSamplesPerSec=44100;format.wBitsPerSample=16;format.nBlockAlign=static_cast<WORD>(s.info.channels*2);
+            format.nAvgBytesPerSec=format.nSamplesPerSec*format.nBlockAlign;
+            auto code=waveOutOpen(&v.output,WAVE_MAPPER,&format,0,0,CALLBACK_NULL);
+            if(code==MMSYSERR_NOERROR){
+                v.header.lpData=reinterpret_cast<char*>(s.data.data()+44);v.header.dwBufferLength=s.info.bytes;
+                code=waveOutPrepareHeader(v.output,&v.header,sizeof(v.header));
+                if(code==MMSYSERR_NOERROR)code=waveOutWrite(v.output,&v.header,sizeof(v.header));
+            }
+            if(code!=MMSYSERR_NOERROR&&v.output){waveOutReset(v.output);close(v);}
+            started[index]=GetTickCount64();
+            record(code==MMSYSERR_NOERROR?(sniper?"intervention_shot":"m9_shot"):"output_failed",code);
+        }
     }
     ReleaseSRWLockExclusive(&audio_lock);
 }

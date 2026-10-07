@@ -11,6 +11,7 @@ class OwnerTestPackageTests(unittest.TestCase):
     def test_partial_install_restores_only_completed_steps(self):
         calls=[]
         with patch.object(owner_test,'bottle_path',return_value=Path('/private-fixture')), \
+             patch.object(owner_test,'INSTALL_AUDIO_BANK',True), \
              patch.object(owner_test,'bottle_processes',return_value=[]), \
              patch.object(owner_test,'verify'), \
              patch.object(owner_test.action_trial,'mutate',side_effect=lambda x:calls.append(('actions',x))), \
@@ -25,6 +26,7 @@ class OwnerTestPackageTests(unittest.TestCase):
     def test_live_private_process_prevents_any_restore(self):
         calls=[]
         with patch.object(owner_test,'bottle_path',return_value=Path('/private-fixture')), \
+             patch.object(owner_test,'INSTALL_AUDIO_BANK',True), \
              patch.object(owner_test,'bottle_processes',return_value=[123]), \
              patch('time.sleep'), \
              patch.object(owner_test,'verify'), \
@@ -66,11 +68,14 @@ class RecoverInterruptedTests(unittest.TestCase):
             with patch.object(owner_test,'guard',return_value=[]), \
                  patch.object(owner_test,'bottle_processes',return_value=[]), \
                  patch.object(owner_test,'verify',return_value={}), \
+                 patch('dsr_mw2.save_banks.inspect',return_value={'active':'validation'}), \
+                 patch('dsr_mw2.save_banks.select') as select, \
                  patch.object(owner_test,'atomic_write') as archive, \
                  patch.object(owner_test.action_trial,'mutate',side_effect=lambda x:calls.append(('actions',x))), \
                  patch.object(owner_test.mpeg_audio_trial,'mutate',side_effect=lambda x:calls.append(('audio',x))), \
                  patch('tools.native_input_trial.mutate',side_effect=lambda x:calls.append(('native',x))):
-                self.assertEqual(owner_test.recover_interrupted(bottle),['native','audio','actions'])
+                self.assertEqual(owner_test.recover_interrupted(bottle),['native','audio','actions','save_bank'])
+                select.assert_called_once_with(bottle,'m9')
             self.assertEqual(calls,[('native','restore'),('audio','restore'),('actions','restore')])
             archive.assert_called_once()
             self.assertFalse((bottle/owner_test.MARKER).exists())
@@ -88,6 +93,21 @@ class RecoverInterruptedTests(unittest.TestCase):
 
     def test_clean_profile_does_nothing(self):
         with tempfile.TemporaryDirectory() as root:
-            with patch.object(owner_test,'bottle_processes') as processes:
+            with patch.object(owner_test,'bottle_processes') as processes, \
+                 patch('dsr_mw2.save_banks.inspect',return_value={'active':'m9'}):
                 self.assertEqual(owner_test.recover_interrupted(Path(root)),[])
             processes.assert_not_called()
+
+
+class StockSoundBankTests(unittest.TestCase):
+    def test_owner_package_leaves_stock_sound_bank(self):
+        calls=[]
+        with patch.object(owner_test,'bottle_path',return_value=Path('/private-fixture')), \
+             patch.object(owner_test,'bottle_processes',return_value=[]), \
+             patch.object(owner_test,'verify'), \
+             patch.object(owner_test.action_trial,'mutate',side_effect=lambda x:calls.append(('actions',x))), \
+             patch.object(owner_test.mpeg_audio_trial,'mutate',side_effect=lambda x:calls.append(('audio',x))), \
+             patch('tools.native_input_trial.mutate',side_effect=lambda x:calls.append(('native',x))):
+            with owner_test.package():pass
+        self.assertNotIn(('audio','install'),calls)
+        self.assertEqual(calls,[('actions','install'),('native','install'),('native','restore'),('actions','restore')])

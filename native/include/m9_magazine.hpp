@@ -64,7 +64,10 @@ public:
             }
             return 0;
         }
-        const bool ready=f.animation<0||f.animation==465500||(f.animation==463000&&f.elapsed>=.08);
+        // Native crossbow aim (465500), recovery (465520) and shot (464000) are the
+        // L1 quick-fire path; the action ESD routes gun requests out of them too.
+        const bool ready=f.animation<0||f.animation==465500||f.animation==465520||
+            ((f.animation==463000||f.animation==464000)&&f.elapsed>=.08);
         // An empty trigger press starts a real reload rather than silently
         // doing nothing. Native animation acknowledgement still gates credit.
         if((reload_edge||(fire_edge&&loaded==0))&&loaded<std::min(capacity,f.total)&&ready){

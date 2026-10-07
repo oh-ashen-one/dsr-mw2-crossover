@@ -57,4 +57,12 @@ int main(){
     // Focus loss cancels pending credit; a clock alone never completes reload.
     m.step({});f.fire=false;f.now=20;m.step(f);f.fire=true;assert(m.step(f)==39);
     f.fire=false;f.now=25;m.step(f);assert(m.loaded==0&&!m.reloading);
+    // L1 quick-fire: R2 during native crossbow recovery or after the native
+    // shot settles must still fire; a just-started native shot must not.
+    M9Magazine q;MagazineFrame n;n.player=7;n.hp=100;n.total=50;n.focused=true;n.loadout=2500000;
+    q.step(n);q.step(n);q.loaded=10;
+    n.animation=465520;n.elapsed=.3;n.now=1;n.fire=true;assert(q.step(n)==37);q.consume(7,50,49,49,1);
+    n.fire=false;n.total=49;q.step(n);
+    n.animation=464000;n.elapsed=.02;n.now=1.5;n.fire=true;assert(q.step(n)==0);
+    n.fire=false;q.step(n);n.elapsed=.2;n.now=1.6;n.fire=true;assert(q.step(n)==37);
 }

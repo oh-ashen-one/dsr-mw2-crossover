@@ -34,9 +34,10 @@ def main():
     configure()
     # The immutable M9 baseline may predate the idle dispatch repair.
     from soulstruct.darksouls1r.ezstate.esd import ChrESD
-    from dsr_mw2.action_priority import prioritize_requests
+    from dsr_mw2.action_priority import prioritize_requests, route_native_crossbow
     player_actions=ChrESD.from_bytes(payload[PATHS[0]])
     prioritize_requests(player_actions.state_machines[1][0].conditions)
+    route_native_crossbow(player_actions.state_machines[1])
     payload[PATHS[0]]=bytes(player_actions)
     from soulstruct.containers import Binder,TPF
     from soulstruct.flver import FLVER

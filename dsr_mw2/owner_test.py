@@ -32,6 +32,8 @@ GATES = {
     'DSR_MW2_SESSION_TRIAL':'owner-2h-test-v1', 'DSR_MW2_VIEWMODEL_TRIAL':'source-vm-v1',
 }
 MARKER = '.dsr-mw2-owner-testing.json'
+# The replaced shot sample doubled the adapter's own MW2 shot; keep DSR's stock sound bank.
+INSTALL_AUDIO_BANK = False
 
 
 def sha(path):
@@ -140,7 +142,8 @@ def recover_interrupted(bottle):
         ('audio',(bottle/mpeg_audio_trial.RECEIPT).exists()),('actions',(bottle/'.dsr-mw2-action-trial.json').exists())) if present]
     marker=bottle/MARKER
     if marker.is_symlink():raise ValueError('Redirected owner-test receipt')
-    if not leftovers and not marker.exists():return []
+    from .save_banks import inspect as inspect_banks
+    if not leftovers and not marker.exists() and inspect_banks(bottle)['active']=='m9':return []
     if guard(bottle) or not wait_for_exit(bottle):
         raise RuntimeError('The previous DSR session is still running; quit it before starting another')
     for item in leftovers:
@@ -149,6 +152,10 @@ def recover_interrupted(bottle):
         else:action_trial.mutate('restore')
     if marker.exists():
         atomic_write(WORKSPACE/'tooling-local/launch'/('owner-session-'+sha(marker)+'.json'),marker.read_bytes());marker.unlink()
+    # The normal exit returns the live save slot to the owner bank; an interrupted one did not.
+    from .save_banks import inspect as inspect_banks, select as select_bank
+    if inspect_banks(bottle)['active']!='m9':
+        select_bank(bottle,'m9');leftovers.append('save_bank')
     print(json.dumps({'status':'recovered_interrupted_session','restored':leftovers,'owner_saves':verify(bottle)}),flush=True)
     return leftovers
 
@@ -160,7 +167,8 @@ def package():
     bottle=bottle_path();completed=[]
     try:
         action_trial.mutate('install');completed.append('actions')
-        mpeg_audio_trial.mutate('install');completed.append('audio')
+        if INSTALL_AUDIO_BANK:
+            mpeg_audio_trial.mutate('install');completed.append('audio')
         native_mutate('install');completed.append('native')
         yield
     finally:
