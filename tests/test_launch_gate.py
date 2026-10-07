@@ -234,3 +234,15 @@ class LaunchGateTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BusyWindowsProgramTests(unittest.TestCase):
+    def test_busy_crossover_programs_block_but_infrastructure_does_not(self):
+        ps=("  190.0 C:\\Program Files (x86)\\Steam\\steamapps\\common\\ARK\\ShooterGame\\Binaries\\Win64\\ShooterGame.exe TheIsland\n"
+            "   30.0 C:\\Program Files (x86)\\Steam\\bin\\cef\\cef.win64\\steamwebhelper.exe --type=renderer\n"
+            "    2.0 Z:\\Users\\x\\Editor\\UE4Editor.exe idle\n"
+            "   12.0 /usr/bin/python3 not windows\n")
+        with patch.object(launch.subprocess,'check_output',return_value=ps):
+            busy=launch.busy_windows_programs()
+        self.assertEqual(len(busy),1)
+        self.assertIn('ShooterGame',busy[0])

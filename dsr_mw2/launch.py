@@ -26,6 +26,20 @@ from .window_controls import start as start_window_controls
 BOTTLE = bottle_path()
 from .local_config import path as configured_path
 GPU = configured_path("gpu_dir", WORKSPACE / "tooling-local/gpu")
+# Windows infrastructure that is never a competing renderer.
+QUIET_WINDOWS = re.compile(r"(?i)steamwebhelper|steamservice|steam\.exe|wineserver|winedevice|services\.exe|"
+                           r"explorer\.exe|plugplay|rpcss|svchost|winemenubuilder|conhost|start\.exe|DarkSoulsRemastered")
+
+
+def busy_windows_programs() -> list[str]:
+    """Other CrossOver programs using CPU, e.g. a game or Unreal editor (shared-slot rule)."""
+    busy = []
+    for line in subprocess.check_output(["ps", "-axo", "%cpu=,command="], text=True).splitlines():
+        match = re.match(r"\s*([\d.]+)\s+(.*)$", line)
+        if match and re.search(r"(?i)[A-Z]:\\.*\.exe", match.group(2)) and not QUIET_WINDOWS.search(match.group(2)) \
+                and float(match.group(1)) >= 5.0:
+            busy.append(match.group(2)[:80])
+    return busy
 STEAM = BOTTLE / "drive_c/Program Files (x86)/Steam"
 SANDBOX = WORKSPACE / "tools/dsr-offline.sb"
 ENGINES = {"gta5.exe", "gta5_enhanced.exe", "eldenring.exe", "darksoulsremastered.exe",
@@ -93,6 +107,9 @@ def preflight(mode: str) -> dict:
             blockers.append('Disposable validation save check failed: ' + str(exc))
     if mode != "steam-login" and (GPU / "PAUSED").exists() and not owner_reserved():
         blockers.append("The Studio coordinator has paused game launches: " + (GPU / "PAUSED").read_text().strip())
+    if mode != "steam-login":
+        for program in busy_windows_programs():
+            blockers.append("Another game or renderer is active (CrossOver): " + program)
     if mode != "steam-login" and (not (GPU / "bin/gpu_slot.py").is_file() or not (GPU / "locks/perf.lock").is_file()):
         blockers.append("The active shared renderer protocol is unavailable")
     if Path("/dev/console").owner() != Path.home().owner():
