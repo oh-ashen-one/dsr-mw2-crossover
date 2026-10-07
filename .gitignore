@@ -51,3 +51,5 @@ __pycache__/
 
 # Generated from your own installed chr/c0000.esd.dcx by tools/build_esd_state_table.py
 native/include/esd_state_table.hpp
+# Generated from your installed GameParam by tools/build_scar_bullet_rows.py
+native/include/scar_bullet_rows.hpp

@@ -20,6 +20,8 @@
 #include "viewmodel_renderer.hpp"
 #include "shot_audio.hpp"
 #include "esd_state_table.hpp"
+#include "bullet_swap.hpp"
+#include "scar_bullet_rows.hpp"
 
 namespace {
 INIT_ONCE once=INIT_ONCE_STATIC_INIT;
@@ -257,6 +259,61 @@ void scoped_hud(dsr_mw2::Address gauge){
     }
     ReleaseSRWLockExclusive(&frame_lock);
 }
+// SCAR-H M203: locate the live Standard Bolt Bullet row once by its exact bytes
+// (private read/write heap only, 4 MB per frame), then let it hold the grenade
+// image only while the SCAR-H is in launcher mode. Any third image, or more than
+// one copy of the row, disables the swap for the session.
+struct BulletSwapState {
+    dsr_mw2::Address next=0x10000,row=0;std::uint64_t reported=0;
+    dsr_mw2::PatternMatches found;bool done=false,fault=false,grenade=false;
+};
+BulletSwapState bullet_swap;
+void bullet_log(const char* kind,unsigned long long value){
+    if(frame_log==INVALID_HANDLE_VALUE)return;
+    char line[192]{};const int n=std::snprintf(line,sizeof(line),"{\"kind\":\"m203_bullet\",\"ms\":%llu,\"event\":\"%s\",\"value\":%llu}\n",GetTickCount64(),kind,value);
+    if(n>0&&n<static_cast<int>(sizeof(line))){DWORD written=0;WriteFile(frame_log,line,static_cast<DWORD>(n),&written,nullptr);}
+}
+void bullet_scan_step(){
+    if(bullet_swap.done||!owner_session)return;
+    constexpr std::size_t size=sizeof(dsr_mw2::standard_bolt_bullet),chunk=1u<<20;
+    static std::uint8_t buffer[chunk];
+    std::size_t budget=4u<<20;
+    while(budget&&!bullet_swap.done){
+        MEMORY_BASIC_INFORMATION m{};
+        if(bullet_swap.next>=0x00007fffffff0000ull||!VirtualQuery(reinterpret_cast<void*>(bullet_swap.next),&m,sizeof(m))){
+            bullet_swap.done=true;
+            if(bullet_swap.found.count==1)bullet_swap.row=bullet_swap.found.at[0];
+            bullet_log(bullet_swap.row?"located":"not_located",bullet_swap.found.count);
+            break;
+        }
+        const auto base=reinterpret_cast<dsr_mw2::Address>(m.BaseAddress),end=base+m.RegionSize;
+        const bool scan=m.State==MEM_COMMIT&&m.Type==MEM_PRIVATE&&(m.Protect&PAGE_READWRITE)&&!(m.Protect&(PAGE_GUARD|PAGE_NOACCESS));
+        if(!scan||end<=bullet_swap.next){bullet_swap.next=end>bullet_swap.next?end:bullet_swap.next+0x1000;continue;}
+        const auto at=std::max(bullet_swap.next,base);
+        const auto length=static_cast<std::size_t>(std::min<dsr_mw2::Address>(chunk,end-at));
+        SIZE_T got=0;
+        if(length>=size&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(at),buffer,length,&got)&&got==length)
+            dsr_mw2::scan_chunk(at,buffer,length,dsr_mw2::standard_bolt_bullet,size,bullet_swap.reported,bullet_swap.found);
+        budget-=std::min(budget,length);
+        if(at+length<end&&length>=size){bullet_swap.next=at+length-(size-1);bullet_swap.reported=bullet_swap.next;}
+        else{bullet_swap.next=end;bullet_swap.reported=end;}
+    }
+}
+void bullet_apply(bool want){
+    if(!bullet_swap.row||bullet_swap.fault)return;
+    constexpr std::size_t size=sizeof(dsr_mw2::standard_bolt_bullet);
+    std::uint8_t current[size];SIZE_T got=0;MEMORY_BASIC_INFORMATION m{};
+    if(!VirtualQuery(reinterpret_cast<void*>(bullet_swap.row),&m,sizeof(m))||m.State!=MEM_COMMIT||!(m.Protect&PAGE_READWRITE)||
+       !ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(bullet_swap.row),current,size,&got)||got!=size){
+        bullet_swap.fault=true;bullet_log("unreadable",bullet_swap.row);return;
+    }
+    switch(dsr_mw2::decide_swap(want,current,dsr_mw2::standard_bolt_bullet,dsr_mw2::m203_grenade_bullet,size)){
+        case dsr_mw2::SwapAction::none:return;
+        case dsr_mw2::SwapAction::fault:bullet_swap.fault=true;bullet_log("unknown_row",bullet_swap.row);return;
+        case dsr_mw2::SwapAction::to_grenade:std::memcpy(reinterpret_cast<void*>(bullet_swap.row),dsr_mw2::m203_grenade_bullet,size);bullet_swap.grenade=true;bullet_log("grenade",1);return;
+        case dsr_mw2::SwapAction::to_bolt:std::memcpy(reinterpret_cast<void*>(bullet_swap.row),dsr_mw2::standard_bolt_bullet,size);bullet_swap.grenade=false;bullet_log("bolt",0);return;
+    }
+}
 void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
     using Function=void(*)(dsr_mw2::Address,float,dsr_mw2::Address);
     original<Function>(dsr_mw2::EntryPoint::pad)(manipulator,dt,control);
@@ -315,6 +372,7 @@ void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
         }
         toggle_was_down=toggle_down;
         f.launcher=scar&&launcher_mode;
+        bullet_scan_step();bullet_apply(f.launcher);
         // Native precision mode suppresses item-use/action14. Read only the
         // owned game's explicit reload key in its already-qualified M9 context.
         f.reload=f.focused&&((GetAsyncKeyState('R')&0x8000)||(aim_enabled&&aim.owned&&(pad.wButtons&XINPUT_GAMEPAD_X)));
@@ -363,7 +421,7 @@ void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
                 GetTickCount64(),request,magazine.loaded,s.first_bolt.quantity,magazine.reloading?"true":"false",magazine.credited?"true":"false",magazine.fault?"true":"false",f.animation,f.elapsed);
             if(n>0&&n<static_cast<int>(sizeof(line))){DWORD written=0;WriteFile(frame_log,line,static_cast<DWORD>(n),&written,nullptr);}
         }
-    }else if(gun_enabled){magazine.step({});if(aim_enabled)aim.stop(reader,base,s);if(view_enabled)dsr_mw2::vm_publish({});}
+    }else if(gun_enabled){bullet_apply(false);magazine.step({});if(aim_enabled)aim.stop(reader,base,s);if(view_enabled)dsr_mw2::vm_publish({});}
     // Never replay a kick after a weapon/focus/menu/aim ownership transition.
     // Native orientation is left intact when ownership ends; no stale undo.
     if(!aim.owned||aim.fault||magazine.fault)recoil.reset();
