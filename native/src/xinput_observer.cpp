@@ -95,6 +95,9 @@ constexpr const wchar_t* hud_names[]={L"bg_parchment_0",L"text",L"F20-01_arrow",
     L"category_l2",L"category_r2",L"text_L",L"text_R",L"category_l",L"category_r",L"targetsite"};
 DWORD pad_thread=0;
 dsr_mw2::M9Magazine magazine;
+// SCAR-H: rifle and M203 keep separate magazines; D-pad Up / G swaps which one
+// `magazine` is, so a toggle never empties or refills the other mode.
+dsr_mw2::M9Magazine other_magazine;bool launcher_mode=false,toggle_was_down=false;
 dsr_mw2::M9NativeAim aim;
 dsr_mw2::M9RecoilDelta recoil;
 bool recoil_fault=false;float scope_fraction=0;
@@ -276,7 +279,7 @@ void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
         f.loadout=(static_cast<std::uint64_t>(s.right_weapon)<<1)|s.right_slot;
         const bool loadout_changed=last_loadout!=f.loadout;
         const auto previous_loadout=last_loadout;
-        if(loadout_changed){aim.stop(reader,base,s);recoil.reset();scope_fraction=0;last_loadout=f.loadout;}
+        if(loadout_changed){aim.stop(reader,base,s);recoil.reset();scope_fraction=0;last_loadout=f.loadout;other_magazine=dsr_mw2::M9Magazine{};launcher_mode=false;}
         const auto action_slot=dsr_mw2::m9_action_slot(animations);
         f.player=s.player;f.total=unlimited_ammo&&s.first_bolt.quantity>0?999:s.first_bolt.quantity;f.hp=static_cast<int>(s.hp);f.animation=animations[action_slot];
         f.elapsed=elapsed[action_slot];f.now=static_cast<double>(GetTickCount64())/1000.;f.focused=foreground==GetCurrentProcessId();
@@ -300,7 +303,18 @@ void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
         // DSR raises native action 1 at a lighter L2 pull than the aim latch's
         // 64; excluding it from the first trigger travel stops L2 firing a shot.
         const bool aim_held=f.focused&&((GetAsyncKeyState(VK_RBUTTON)&0x8000)||pad.bLeftTrigger>=8);
-        f.fire=dsr_mw2::m9_fire_intent(s.actions,f.focused&&pad.bRightTrigger>=64,aim_held);
+        // Held left mouse is read directly so full-auto works on mouse; semi guns still need an edge.
+        f.fire=dsr_mw2::m9_fire_intent(s.actions,f.focused&&(pad.bRightTrigger>=64||(GetAsyncKeyState(VK_LBUTTON)&0x8000)),aim_held);
+        const bool scar=dsr_mw2::is_scar(s.right_weapon);
+        const bool toggle_down=f.focused&&scar&&((pad.wButtons&XINPUT_GAMEPAD_DPAD_UP)||(GetAsyncKeyState('G')&0x8000));
+        if(toggle_down&&!toggle_was_down&&!magazine.reloading){
+            std::swap(magazine,other_magazine);launcher_mode=!launcher_mode;
+            char line[160]{};const int n=std::snprintf(line,sizeof(line),"{\"kind\":\"scar_mode\",\"ms\":%llu,\"launcher\":%s}\n",
+                GetTickCount64(),launcher_mode?"true":"false");
+            if(n>0&&n<static_cast<int>(sizeof(line))){DWORD written=0;WriteFile(frame_log,line,static_cast<DWORD>(n),&written,nullptr);}
+        }
+        toggle_was_down=toggle_down;
+        f.launcher=scar&&launcher_mode;
         // Native precision mode suppresses item-use/action14. Read only the
         // owned game's explicit reload key in its already-qualified M9 context.
         f.reload=f.focused&&((GetAsyncKeyState('R')&0x8000)||(aim_enabled&&aim.owned&&(pad.wButtons&XINPUT_GAMEPAD_X)));

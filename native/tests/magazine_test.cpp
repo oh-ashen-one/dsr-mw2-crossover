@@ -65,4 +65,22 @@ int main(){
     n.fire=false;n.total=49;q.step(n);
     n.animation=464000;n.elapsed=.02;n.now=1.5;n.fire=true;assert(q.step(n)==0);
     n.fire=false;q.step(n);n.elapsed=.2;n.now=1.6;n.fire=true;assert(q.step(n)==37);
+    // SCAR-H: held trigger keeps firing at its interval; a release is not needed.
+    {M9Magazine r;MagazineFrame s;s.player=9;s.hp=100;s.total=999;s.focused=true;
+     s.loadout=static_cast<std::uint64_t>(scar_weapon)<<1;r.step(s);r.step(s);r.loaded=20;
+     s.fire=true;s.now=1;assert(r.step(s)==37);r.consume(9,999,998,998,1);
+     s.now=1.05;assert(r.step(s)==0);               // inside the cyclic interval
+     s.now=1.11;assert(r.step(s)==37);r.consume(9,998,997,997,1.11);
+     s.now=1.22;s.animation=463000;s.elapsed=.1;assert(r.step(s)==37);
+     assert(r.loaded==18);
+     // M9 stays semi-automatic: holding does not repeat.
+     M9Magazine m9;MagazineFrame h;h.player=3;h.hp=100;h.total=50;h.focused=true;h.loadout=2500000;
+     m9.step(h);m9.step(h);m9.loaded=10;h.fire=true;h.now=1;assert(m9.step(h)==37);m9.consume(3,50,49,49,1);
+     h.now=2;assert(m9.step(h)==0);}
+    // M203 launcher mode: one round, then an empty pull starts its timed reload.
+    {M9Magazine g;MagazineFrame l;l.player=9;l.hp=100;l.total=999;l.focused=true;l.launcher=true;
+     l.loadout=static_cast<std::uint64_t>(scar_weapon)<<1;g.step(l);g.step(l);g.loaded=1;
+     l.fire=true;l.now=1;assert(g.step(l)==37);g.consume(9,999,998,998,1);assert(g.loaded==0);
+     l.fire=false;l.now=1.2;g.step(l);l.fire=true;l.now=1.3;assert(g.step(l)==39);
+     assert(gun_profile(scar_weapon,true).capacity==1&&gun_profile(scar_weapon).capacity==20&&gun_profile(9200000).capacity==5);}
 }

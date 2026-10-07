@@ -6,6 +6,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include "gun_profile.hpp"
 namespace dsr_mw2 {
 inline unsigned m9_action_slot(const std::array<std::int32_t,31>& animations){
     // General damage/evade/reload takes precedence. The verified upper-body
@@ -19,6 +20,7 @@ struct MagazineFrame {
     int total=0,hp=0,animation=-1;
     double elapsed=0,now=0;
     bool focused=false,fire=false,reload=false,interrupted=false;
+    bool launcher=false; // SCAR-H M203 mode selects the launcher profile
     std::uint64_t loadout=0;
 };
 class M9Magazine {
@@ -37,8 +39,9 @@ public:
         fire=f.fire;reload=f.reload;
         if(f.hp<hp||f.interrupted){cancel();hp=f.hp;return 0;}hp=f.hp;
         if(fault)return 0;
-        const bool sniper=(f.loadout>>1)==9200000;
-        const int capacity=sniper?5:15;
+        const GunProfile& profile=gun_profile(static_cast<std::int32_t>(f.loadout>>1),f.launcher);
+        const bool timed=profile.timed_reload;
+        const int capacity=profile.capacity;
         if(reloading){
             reload_elapsed=std::max(0.,f.now-request_time);
             if(f.animation==reload_animation){
@@ -51,16 +54,16 @@ public:
                 else{
                     last_progress=f.elapsed;
                     if(f.elapsed>=1.2)native_reload_verified=true;
-                    if(!sniper&&!credited&&native_reload_verified){loaded=std::min(capacity,f.total);credited=true;}
+                    if(!timed&&!credited&&native_reload_verified){loaded=std::min(capacity,f.total);credited=true;}
                 }
             }else if(seen){
                 // The native clip can finish before the longer authored MW2
                 // reload. Only a verified uninterrupted reload may continue.
-                if(!(sniper&&native_reload_verified&&(f.animation<0||f.animation==465500)))cancel();
+                if(!(timed&&native_reload_verified&&(f.animation<0||f.animation==465500)))cancel();
             }else if(f.now-request_time>.3)cancel();
-            if(sniper&&reloading&&native_reload_verified){
-                if(!credited&&reload_elapsed>=1.8){loaded=std::min(capacity,f.total);credited=true;}
-                if(reload_elapsed>=(empty_reload?3.867:2.268))cancel();
+            if(timed&&reloading&&native_reload_verified){
+                if(!credited&&reload_elapsed>=profile.reload_credit){loaded=std::min(capacity,f.total);credited=true;}
+                if(reload_elapsed>=(empty_reload?profile.empty_reload_end:profile.reload_end))cancel();
             }
             return 0;
         }
@@ -75,7 +78,8 @@ public:
             native_reload_verified=false;reload_elapsed=0;empty_reload=loaded==0;
             reload_animation=loaded?465502:465501;return loaded?38:39;
         }
-        if(fire_edge&&loaded>0&&ready&&f.now-last_shot>=(sniper?.916:.08))return 37;
+        const bool pull=fire_edge||(profile.automatic&&f.fire);
+        if(pull&&loaded>0&&ready&&f.now-last_shot>=profile.interval)return 37;
         return 0;
     }
     void consume(std::uint64_t actor,int before,int after,int result,double now){
