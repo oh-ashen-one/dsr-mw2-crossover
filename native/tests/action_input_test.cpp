@@ -8,6 +8,12 @@ int main(){
     // empty magazine, while movement/menu/stance requests remain untouched.
     std::array<std::uint8_t,53> a{};a[1]=1;a[21]=1;a[10]=1;
     assert(m9_fire_intent(a,false));
+    // Owner trace: L2 aim holds native 1/19/21/52 continuously; R2 then adds
+    // 0/7 plus the trigger. Only the press may count as fire while aiming.
+    {std::array<std::uint8_t,53> aim{};aim[1]=aim[19]=aim[21]=aim[52]=1;
+     assert(!m9_fire_intent(aim,false,true));
+     assert(m9_fire_intent(aim,true,true));
+     aim[0]=aim[7]=1;assert(m9_fire_intent(aim,false,true));}
     m9_route_actions(a,0,false,true);
     assert(!a[1]&&!a[0]&&!a[37]&&a[21]&&a[10]);
     a[1]=1;m9_route_actions(a,37,false,true);

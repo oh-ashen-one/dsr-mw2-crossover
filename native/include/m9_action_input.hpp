@@ -3,8 +3,10 @@
 #include <array>
 #include <cstdint>
 namespace dsr_mw2 {
-inline bool m9_fire_intent(const std::array<std::uint8_t,53>& actions,bool trigger){
-    return actions[0]||actions[1]||actions[7]||trigger;
+inline bool m9_fire_intent(const std::array<std::uint8_t,53>& actions,bool trigger,bool aim_held=false){
+    // While L2/RMB aims, DSR holds native action 1 (with 19/21/52) for the aim
+    // itself. Counting it as a held trigger hid every R2/R1 press edge.
+    return actions[0]||(actions[1]&&!aim_held)||actions[7]||trigger;
 }
 inline void m9_route_actions(std::array<std::uint8_t,53>& actions,int request,bool reload,bool aim){
     // R2 is native heavy fire (1), including the two-handed crossbow path.

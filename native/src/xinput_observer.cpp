@@ -291,7 +291,8 @@ void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
             }
         }
         const auto pad=current_controller();
-        f.fire=dsr_mw2::m9_fire_intent(s.actions,f.focused&&pad.bRightTrigger>=64);
+        const bool aim_held=f.focused&&((GetAsyncKeyState(VK_RBUTTON)&0x8000)||pad.bLeftTrigger>=64);
+        f.fire=dsr_mw2::m9_fire_intent(s.actions,f.focused&&pad.bRightTrigger>=64,aim_held);
         // Native precision mode suppresses item-use/action14. Read only the
         // owned game's explicit reload key in its already-qualified M9 context.
         f.reload=f.focused&&((GetAsyncKeyState('R')&0x8000)||(aim_enabled&&aim.owned&&(pad.wButtons&XINPUT_GAMEPAD_X)));
@@ -750,6 +751,34 @@ void esd_tick(ULONGLONG now){
         esd_write(line,std::snprintf(line,sizeof(line),"{\"kind\":\"esd_heartbeat\",\"ms\":%llu,\"hp\":%d,\"states\":[%s]}\n",now,hp_read?static_cast<int>(hp):-1,states));
     }
 }
+// Read-only interaction trace (owner sessions only): ladders/doors never
+// raised native requests 43/47. On each Cross/A or E press, record the native
+// action bits, weapons, stance and live ESD states for 1.5 s whenever they change.
+ULONGLONG interact_until=0;bool interact_was_down=false;
+std::array<std::uint8_t,0x35> interact_last{};
+void interact_tick(ULONGLONG now,DWORD result,const XINPUT_STATE* state){
+    if(!owner_session||log_file==INVALID_HANDLE_VALUE)return;
+    const bool pad_down=result==ERROR_SUCCESS&&state&&(state->Gamepad.wButtons&XINPUT_GAMEPAD_A);
+    DWORD foreground=0;GetWindowThreadProcessId(GetForegroundWindow(),&foreground);
+    const bool focused=foreground==GetCurrentProcessId();
+    const bool down=focused&&(pad_down||(GetAsyncKeyState('E')&0x8000));
+    const bool press=down&&!interact_was_down;interact_was_down=down;
+    if(press)interact_until=now+1500;
+    if(now>interact_until)return;
+    LocalReader reader;dsr_mw2::Snapshot s;
+    const auto status=dsr_mw2::observe(reader,reinterpret_cast<dsr_mw2::Address>(GetModuleHandleW(nullptr)),s);
+    if(!press&&s.actions==interact_last)return;
+    interact_last=s.actions;
+    char bits[200]{};int at=0;
+    for(unsigned i=0;i<s.actions.size()&&at<180;++i)if(s.actions[i])at+=std::snprintf(bits+at,sizeof(bits)-static_cast<std::size_t>(at),"%s%u",at?",":"",i);
+    char states[64]{};int sat=0;
+    for(std::size_t i=0;i<esd_logged&&i<3;++i)
+        sat+=std::snprintf(states+sat,sizeof(states)-static_cast<std::size_t>(sat),"%s[%d,%d]",i?",":"",esd_probe.holder(i).last.machine,esd_probe.holder(i).last.state);
+    char line[512];
+    esd_write(line,std::snprintf(line,sizeof(line),
+        "{\"kind\":\"interact_trace\",\"ms\":%llu,\"press\":%s,\"pad\":%s,\"snapshot\":%u,\"hp\":%u,\"right\":%d,\"left\":%d,\"style\":%u,\"actions\":[%s],\"esd\":[%s]}\n",
+        now,press?"true":"false",pad_down?"true":"false",static_cast<unsigned>(status),s.hp,s.right_weapon,s.left_weapon,s.weapon_style,bits,states));
+}
 void sample(DWORD slot,DWORD result,const XINPUT_STATE* state,dsr_mw2::Address caller) {
     AcquireSRWLockExclusive(&controller_lock);
     if(result==ERROR_SUCCESS&&state&&(controller_slot==slot||controller_slot>=4||GetTickCount64()-controller_stamp>=250)){
@@ -760,6 +789,7 @@ void sample(DWORD slot,DWORD result,const XINPUT_STATE* state,dsr_mw2::Address c
     ++calls;
     const auto now=GetTickCount64();
     esd_tick(now);
+    interact_tick(now,result,state);
     if(now-last_sample>=500) {
         last_sample=now;
         LocalReader reader;dsr_mw2::Snapshot s;
