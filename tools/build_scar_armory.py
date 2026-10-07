@@ -109,7 +109,7 @@ def main():
     weapon.WeaponModel = MODEL; weapon.Weight = 5.0; weapon.BasePhysicalDamage = DAMAGE
     entry = next(e for e in params.entries if e.path.endswith('\\EquipParamWeapon.param'))
     entry.set_uncompressed_data(append_fixed_row(entry.get_uncompressed_data(), WEAPON, bytes(weapon)))
-    shop = copy.deepcopy(tables['ShopLineupParam'][11003]); shop.ItemID = WEAPON; shop.SoulCost = 1
+    shop = copy.deepcopy(tables['ShopLineupParam'][11003]); shop.ItemID = WEAPON; shop.SoulCost = 0
     entry = next(e for e in params.entries if e.path.endswith('\\ShopLineupParam.param'))
     entry.set_uncompressed_data(append_fixed_row(entry.get_uncompressed_data(), SHOP, bytes(shop)))
     payload[PATHS[4]] = bytes(params)
@@ -138,13 +138,13 @@ def main():
         f.entries[WEAPON] = ('MW2 SCAR-H' if e.entry_id in (11, 115) else
                              'Original MW2 SCAR-H battle rifle with M203 launcher.' if e.entry_id in (21, 114) else
                              'Original MW2 SCAR-H and M203, model and animations.\nFull auto, 20-round magazine; L2 aim, R2 fire.\n'
-                             'D-pad Up (or G) toggles the M203 grenade launcher.\nUses Standard Bolts. One-soul test price; no upgrades.')
+                             'D-pad Up (or B) toggles the M203 grenade launcher.\nUses Standard Bolts. One-soul test price; no upgrades.')
         e.set_uncompressed_data(bytes(f))
     payload[ARMORY_PATHS[3]] = bytes(messages)
     report = {**current, 'variant': current['variant'] + '-scar', 'files': {p: sha(d) for p, d in payload.items()},
               'stock': {**current['stock'], PART: None},
               'scar': {'weapon': WEAPON, 'model': MODEL, 'shop': SHOP, 'souls': 1, 'base_physical_damage': DAMAGE,
-                       'launcher': 'D-pad Up / G toggles M203; grenade Bullet 54014 swapped over Bullet 600 at runtime',
+                       'launcher': 'D-pad Up / B toggles M203; grenade Bullet 54014 swapped over Bullet 600 at runtime',
                        'world_model_sha256': world_sha, 'textures': texture_proof, 'runtime_verified': False}}
     for p, d in payload.items():
         target = OUT / p; target.parent.mkdir(parents=True, exist_ok=True); atomic_write(target, d)

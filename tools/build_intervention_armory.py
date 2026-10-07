@@ -100,7 +100,7 @@ def main():
     weapon=copy.deepcopy(tables['EquipParamWeapon'][1250000]);weapon.WeaponModel=MODEL;weapon.Weight=7.0;weapon.BasePhysicalDamage=350
     for i in range(16):setattr(weapon,'UpgradeOrigin'+str(i),-1)
     entry=next(e for e in params.entries if e.path.endswith('\\EquipParamWeapon.param'));entry.set_uncompressed_data(append_fixed_row(entry.get_uncompressed_data(),WEAPON,bytes(weapon)))
-    shop=copy.deepcopy(tables['ShopLineupParam'][11000]);shop.ItemID=WEAPON;shop.SoulCost=1
+    shop=copy.deepcopy(tables['ShopLineupParam'][11000]);shop.ItemID=WEAPON;shop.SoulCost=0
     entry=next(e for e in params.entries if e.path.endswith('\\ShopLineupParam.param'));entry.set_uncompressed_data(append_fixed_row(entry.get_uncompressed_data(),11003,bytes(shop)))
     payload[PATHS[4]]=bytes(params)
     rt={k.rsplit('\\',1)[-1]:v for k,v in GameParamBND.from_bytes(payload[PATHS[4]]).params.items()}

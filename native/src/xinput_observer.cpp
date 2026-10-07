@@ -97,7 +97,8 @@ constexpr const wchar_t* hud_names[]={L"bg_parchment_0",L"text",L"F20-01_arrow",
     L"category_l2",L"category_r2",L"text_L",L"text_R",L"category_l",L"category_r",L"targetsite"};
 DWORD pad_thread=0;
 dsr_mw2::M9Magazine magazine;
-// SCAR-H: rifle and M203 keep separate magazines; D-pad Up / G swaps which one
+// SCAR-H: rifle and M203 keep separate magazines; D-pad Up / B swaps which one
+// (G is DSR's keyboard gesture menu)
 // `magazine` is, so a toggle never empties or refills the other mode.
 dsr_mw2::M9Magazine other_magazine;bool launcher_mode=false,toggle_was_down=false;std::uint64_t scar_mode_tick=0;
 dsr_mw2::M9NativeAim aim;
@@ -363,7 +364,7 @@ void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
         // Held left mouse is read directly so full-auto works on mouse; semi guns still need an edge.
         f.fire=dsr_mw2::m9_fire_intent(s.actions,f.focused&&(pad.bRightTrigger>=64||(GetAsyncKeyState(VK_LBUTTON)&0x8000)),aim_held);
         const bool scar=dsr_mw2::is_scar(s.right_weapon);
-        const bool toggle_down=f.focused&&scar&&((pad.wButtons&XINPUT_GAMEPAD_DPAD_UP)||(GetAsyncKeyState('G')&0x8000));
+        const bool toggle_down=f.focused&&scar&&((pad.wButtons&XINPUT_GAMEPAD_DPAD_UP)||(GetAsyncKeyState('B')&0x8000));
         if(toggle_down&&!toggle_was_down&&!magazine.reloading){
             std::swap(magazine,other_magazine);launcher_mode=!launcher_mode;scar_mode_tick=GetTickCount64();
             char line[160]{};const int n=std::snprintf(line,sizeof(line),"{\"kind\":\"scar_mode\",\"ms\":%llu,\"launcher\":%s}\n",

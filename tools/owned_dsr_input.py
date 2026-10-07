@@ -6,7 +6,7 @@ from dsr_mw2.launch import game_processes
 from tools.inspect_dsr_window import windows
 from dsr_mw2.validation_session import require_active
 
-KEYS={'w':13,'a':0,'s':1,'d':2,'e':14,'q':12,'r':15,'f':3,'enter':36,'escape':53,
+KEYS={'w':13,'a':0,'s':1,'d':2,'e':14,'q':12,'r':15,'f':3,'g':5,'b':11,'x':7,'enter':36,'escape':53,
       'space':49,'tab':48,'left':123,'right':124,'down':125,'up':126,'shift':56,'ctrl':59}
 
 
@@ -47,7 +47,9 @@ def _historical_input_main():
     games=game_processes()
     if len(games)!=1:raise ValueError('Expected exactly one task-owned native game')
     pid=games[0]
-    visible=[w for w in windows() if w.get('kCGWindowAlpha',0)>0 and w.get('kCGWindowBounds',{}).get('Width',0)>100]
+    # Layer-0 app windows only: system overlays such as the Dock's transparent
+    # full-screen layer-20 window do not intercept clicks over the game.
+    visible=[w for w in windows() if w.get('kCGWindowAlpha',0)>0 and w.get('kCGWindowLayer',0)==0 and w.get('kCGWindowBounds',{}).get('Width',0)>100]
     target=next(w for w in visible if w.get('kCGWindowOwnerPID')==pid and w.get('kCGWindowName')=='DARK SOULS™: REMASTERED')
     b=target['kCGWindowBounds']
     cg=ctypes.CDLL('/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics')

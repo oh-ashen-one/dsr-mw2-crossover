@@ -59,7 +59,7 @@ def main():
     shop_data=se.get_uncompressed_data()
     # Explicit trial economy: base M9 costs1000, attachment variant30. Native
     # Standard Bolt cost30 is retained. Purchases never replenish ammunition.
-    for sid,item,cost in ((11000,1250000,1000),(11001,WEAPON,30),(11002,2100000,1)):
+    for sid,item,cost in ((11000,1250000,1000),(11001,WEAPON,30),(11002,2100000,0)):
         if sid in shops.rows:raise ValueError('Armory shop ID occupied')
         row=copy.deepcopy(shops[1126]);row.ItemID=item;row.SoulCost=cost
         row.QuantityFlag=-1;row.InitialQuantity=-1;row.RequiredGood=-1;row.QWCID=-1

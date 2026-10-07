@@ -2,6 +2,21 @@
 
 Updated 2026-10-06. Branch: `codex/controller-aim-repair`. **Work in progress; controller and repeated Intervention firing are not accepted as fixed.**
 
+## Claude agent play-test — 2026-10-07 (SCAR-H build, heavy diagnostics off)
+
+Agent keyboard/mouse in the disposable validation bank (owner-authorized), through `tools/owned_dsr_input.py`. Results are from native logs and screenshots:
+- **SCAR-H purchase:** Darksign to the Asylum courtyard bonfire, then the MW2 armory lists the M9, M9 + suppressor, Intervention and SCAR-H. The SCAR-H was bought and equipped (loadout weapon 9300000).
+- **Reload:** R loaded 20 rounds; credit at about 2.0 s, finish at about 3.0 s.
+- **Full auto:** holding left mouse for 1.2 s gave 11 native shots about 0.11 s apart; the magazine went 20 → 9; every receipt `unlimited_kept` (bolts stayed 140); 11 `scar_shot` sounds.
+- **M203:** the live Bullet 600 row was located (exactly one match). The toggle logged `scar_mode launcher` and `m203_bullet grenade`. The launcher magazine reloaded to 1 and the grenade fired (`m203_shot`, bolt kept). A fiery impact burst is visible on the arch pillar.
+- **Interaction survives aiming:** after Intervention aim + five shots, SCAR-H full auto and M203 shots, the bonfire prompt and menu still work. Unequip (F in the equipment menu) also works. With the heavy diagnostics off, the "A disappears after aiming" failure did not reproduce.
+- **Audio is produced:** a ScreenCaptureKit capture of only the DSR process measured mean -22.4 dB and peak -2.6 dB (bonfire ambience plus grenade shot). File: `evidence/raw/20261007/audio-check-*.mp4`.
+- **Bolt-slot confusion explained:** the character owns 140 Standard Bolts equipped in a bolt slot. The native total reads the equipped slot, so an unequipped bolt stack means no shots.
+- **Fixes from the test:**
+  - The keyboard M203 toggle moved from G (DSR's gesture menu) to B.
+  - The input tool ignores the Dock's transparent layer-20 overlay and gained G/B/X keys.
+  - Armory items are free (owner economy).
+
 ## Best owner run so far — 2026-10-06 late night
 
 Owner result: new character, controller working, door/bonfire interaction, M9 and Intervention aiming and shooting, boss killed, boss weapon and key collected.
