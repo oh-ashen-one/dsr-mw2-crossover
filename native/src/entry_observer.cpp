@@ -78,6 +78,8 @@ extern "C" void DsrEntryObserverRecord(const dsr_mw2::EntryRegisters* regs,unsig
     if(index<slots.size()&&slots[index].notify&&regs)slots[index].notify(*regs);
 }
 namespace dsr_mw2 {
+alignas(8) volatile std::uint64_t input_lookup_hits=0;
+std::uint64_t input_lookup_guard_hits(){return input_lookup_hits;}
 bool install_input_lookup_guard(std::uintptr_t base){
     static Slot guard;
     if(guard.published)return true;
@@ -88,7 +90,7 @@ bool install_input_lookup_guard(std::uintptr_t base){
        std::memcmp(completion,completion_prefix,sizeof(completion_prefix)))return false;
     auto* executable=VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE);
     if(!executable)return false;
-    const auto code=input_lookup_code(base+0x54c4d7,base+0x54c618);
+    const auto code=input_lookup_code(base+0x54c4d7,base+0x54c618,reinterpret_cast<std::uintptr_t>(&input_lookup_hits));
     std::memcpy(executable,code.data(),code.size());DWORD old=0;
     if(!VirtualProtect(executable,4096,PAGE_EXECUTE_READ,&old)||
        !FlushInstructionCache(GetCurrentProcess(),executable,code.size())){

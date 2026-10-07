@@ -33,7 +33,7 @@ def run():
             env=environment(),capture_output=True,text=True,timeout=25)
         if result.returncode:raise RuntimeError('Input guard fixture failed: '+str(result.returncode))
         checks=json.loads(result.stdout)
-        if set(checks)!={'empty_completed','valid_preserved','reserved_preserved','flags_preserved'} or not all(checks.values()):
+        if set(checks)!={'empty_completed','valid_preserved','reserved_preserved','flags_preserved','empty_counted'} or not all(checks.values()):
             raise ValueError('Input guard behavior failed')
         for _ in range(15):
             if not bottle_processes(bottle):break

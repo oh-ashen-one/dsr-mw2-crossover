@@ -42,6 +42,7 @@ public:
         std::uint8_t length = 0;                      // offsets in path (root field first)
         std::array<std::uint16_t, max_depth + 1> path{};
         EsdStateHit last;
+        bool near_buffer = false;                     // within the ESD size of its target; may be ESD-internal
     };
 
     EsdStateProbe(const EsdStateSignature* table, std::size_t count, std::size_t esd_span)
@@ -87,9 +88,13 @@ public:
                 if (hit.state >= 0) {
                     const Address location = node.at + offset;
                     const Address distance = location > value ? location - value : value - location;
-                    if (distance < span_) { ++internal_; continue; }  // pointer inside the ESD buffer itself
+                    // Live state pointers can also sit near the buffer; keep them,
+                    // flagged, and let the change trace show which ones move.
+                    const bool inside_span = distance < span_;
+                    if (inside_span) ++internal_;
                     if (holders_ < holder_cap) {
                         Holder& h = holder_[holders_++];
+                        h.near_buffer = inside_span;
                         h.length = static_cast<std::uint8_t>(node.depth + 1);
                         fill_path(next_, h);
                         h.path[node.depth] = static_cast<std::uint16_t>(offset);

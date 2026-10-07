@@ -60,11 +60,12 @@ void found_by_path() {
     auto probe = std::make_unique<EsdStateProbe>(esd_state_table, std::size(esd_state_table), esd_state_span);
     probe->reset(root);
     while (!probe->finished()) probe->step(*m, 1u << 20);
-    assert(probe->holders() == 2);
+    assert(probe->holders() == 3);
     assert(probe->internal() == 1);
     bool saw_m1 = false, saw_m0 = false;
     for (std::size_t i = 0; i < probe->holders(); ++i) {
         const auto& h = probe->holder(i);
+        if (h.near_buffer) { assert(h.length == 2 && h.path[0] == 0x90 && (h.last == EsdStateHit{1, 9003})); continue; }
         assert(h.length == 3 && h.path[0] == 0x68 && h.path[1] == 0x30);
         if (h.path[2] == 0x18) { assert((h.last == EsdStateHit{1, 0})); saw_m1 = true; }
         if (h.path[2] == 0x20) { assert((h.last == EsdStateHit{0, 0})); saw_m0 = true; }
@@ -74,10 +75,11 @@ void found_by_path() {
     // Live transition: machine 1 enters the scoped hold; re-reading the path reports it.
     m->put(b + 0x18, m1_hold);
     for (std::size_t i = 0; i < probe->holders(); ++i)
-        if (probe->holder(i).path[2] == 0x18) assert((probe->resolve(*m, i) == EsdStateHit{1, 9003}));
+        if (!probe->holder(i).near_buffer && probe->holder(i).path[2] == 0x18) assert((probe->resolve(*m, i) == EsdStateHit{1, 9003}));
     // Broken chain is unreadable, not a fabricated state.
     m->put(a + 0x30, std::uint64_t(0));
-    for (std::size_t i = 0; i < probe->holders(); ++i) assert(probe->resolve(*m, i).state == -1);
+    for (std::size_t i = 0; i < probe->holders(); ++i)
+        if (!probe->holder(i).near_buffer) assert(probe->resolve(*m, i).state == -1);
 }
 
 void small_budget_matches() {
@@ -91,7 +93,7 @@ void small_budget_matches() {
         assert(m->reads - before <= 3 + 2);              // window fallbacks may add two reads
         ++calls;
     }
-    assert(calls > 2 && probe->holders() == 2 && probe->internal() == 1);
+    assert(calls > 2 && probe->holders() == 3 && probe->internal() == 1);
 }
 
 void rejects_lookalikes() {

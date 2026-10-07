@@ -291,7 +291,9 @@ void post_pad(dsr_mw2::Address manipulator,float dt,dsr_mw2::Address control){
             }
         }
         const auto pad=current_controller();
-        const bool aim_held=f.focused&&((GetAsyncKeyState(VK_RBUTTON)&0x8000)||pad.bLeftTrigger>=64);
+        // DSR raises native action 1 at a lighter L2 pull than the aim latch's
+        // 64; excluding it from the first trigger travel stops L2 firing a shot.
+        const bool aim_held=f.focused&&((GetAsyncKeyState(VK_RBUTTON)&0x8000)||pad.bLeftTrigger>=8);
         f.fire=dsr_mw2::m9_fire_intent(s.actions,f.focused&&pad.bRightTrigger>=64,aim_held);
         // Native precision mode suppresses item-use/action14. Read only the
         // owned game's explicit reload key in its already-qualified M9 context.
@@ -717,8 +719,8 @@ void esd_tick(ULONGLONG now){
         const auto& h=esd_probe.holder(esd_logged);
         char path[96]{};int at=0;
         for(std::uint8_t k=0;k<h.length&&at<80;++k)at+=std::snprintf(path+at,sizeof(path)-static_cast<std::size_t>(at),"%s%u",k?",":"",static_cast<unsigned>(h.path[k]));
-        esd_write(line,std::snprintf(line,sizeof(line),"{\"kind\":\"esd_holder\",\"ms\":%llu,\"holder\":%zu,\"path\":[%s],\"machine\":%d,\"state\":%d,\"root\":\"%llx\"}\n",
-            now,esd_logged,path,h.last.machine,h.last.state,static_cast<unsigned long long>(esd_root)));
+        esd_write(line,std::snprintf(line,sizeof(line),"{\"kind\":\"esd_holder\",\"ms\":%llu,\"holder\":%zu,\"path\":[%s],\"machine\":%d,\"state\":%d,\"near_buffer\":%s,\"root\":\"%llx\"}\n",
+            now,esd_logged,path,h.last.machine,h.last.state,h.near_buffer?"true":"false",static_cast<unsigned long long>(esd_root)));
         ++esd_logged;
     }
     if(esd_probe.finished()&&!esd_finish_logged){
@@ -756,8 +758,16 @@ void esd_tick(ULONGLONG now){
 // action bits, weapons, stance and live ESD states for 1.5 s whenever they change.
 ULONGLONG interact_until=0;bool interact_was_down=false;
 std::array<std::uint8_t,0x35> interact_last{};
+std::uint64_t guard_logged=0;ULONGLONG guard_log_at=0;
 void interact_tick(ULONGLONG now,DWORD result,const XINPUT_STATE* state){
     if(!owner_session||log_file==INVALID_HANDLE_VALUE)return;
+    const auto hits=dsr_mw2::input_lookup_guard_hits();
+    if(hits!=guard_logged&&now-guard_log_at>=1000){
+        char note[160];
+        esd_write(note,std::snprintf(note,sizeof(note),"{\"kind\":\"input_lookup_empty\",\"ms\":%llu,\"hits\":%llu,\"new\":%llu}\n",
+            now,static_cast<unsigned long long>(hits),static_cast<unsigned long long>(hits-guard_logged)));
+        guard_logged=hits;guard_log_at=now;
+    }
     const bool pad_down=result==ERROR_SUCCESS&&state&&(state->Gamepad.wButtons&XINPUT_GAMEPAD_A);
     DWORD foreground=0;GetWindowThreadProcessId(GetForegroundWindow(),&foreground);
     const bool focused=foreground==GetCurrentProcessId();
@@ -776,8 +786,8 @@ void interact_tick(ULONGLONG now,DWORD result,const XINPUT_STATE* state){
         sat+=std::snprintf(states+sat,sizeof(states)-static_cast<std::size_t>(sat),"%s[%d,%d]",i?",":"",esd_probe.holder(i).last.machine,esd_probe.holder(i).last.state);
     char line[512];
     esd_write(line,std::snprintf(line,sizeof(line),
-        "{\"kind\":\"interact_trace\",\"ms\":%llu,\"press\":%s,\"pad\":%s,\"snapshot\":%u,\"hp\":%u,\"right\":%d,\"left\":%d,\"style\":%u,\"actions\":[%s],\"esd\":[%s]}\n",
-        now,press?"true":"false",pad_down?"true":"false",static_cast<unsigned>(status),s.hp,s.right_weapon,s.left_weapon,s.weapon_style,bits,states));
+        "{\"kind\":\"interact_trace\",\"ms\":%llu,\"press\":%s,\"pad\":%s,\"snapshot\":%u,\"hp\":%u,\"right\":%d,\"left\":%d,\"style\":%u,\"actions\":[%s],\"esd\":[%s],\"guard_hits\":%llu}\n",
+        now,press?"true":"false",pad_down?"true":"false",static_cast<unsigned>(status),s.hp,s.right_weapon,s.left_weapon,s.weapon_style,bits,states,static_cast<unsigned long long>(dsr_mw2::input_lookup_guard_hits())));
 }
 void sample(DWORD slot,DWORD result,const XINPUT_STATE* state,dsr_mw2::Address caller) {
     AcquireSRWLockExclusive(&controller_lock);
